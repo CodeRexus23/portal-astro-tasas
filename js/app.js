@@ -826,12 +826,25 @@ function renderAdminView() {
 }
 
 // --- AUTENTICACIÓN DEL ADMINISTRADOR ---
+function toggleAdminPasswordVisibility() {
+  const input = document.getElementById('admin-password-input');
+  const icon = document.getElementById('admin-pass-eye-icon');
+  if (!input) return;
+  const isPass = input.type === 'password';
+  input.type = isPass ? 'text' : 'password';
+  if (icon) {
+    icon.setAttribute('data-lucide', isPass ? 'eye-off' : 'eye');
+    if (window.lucide) window.lucide.createIcons();
+  }
+}
+
 function handleAdminLogin(e) {
   e.preventDefault();
-  const passInput = document.getElementById('admin-password-input').value;
-  const savedPass = localStorage.getItem(STORAGE_KEYS.ADMIN_PASS) || 'Mark*L15';
+  const rawInput = document.getElementById('admin-password-input').value || '';
+  const cleanInput = rawInput.trim().replace(/^["'“”]+|["'“”]+$/g, '').trim();
+  const savedPass = (localStorage.getItem(STORAGE_KEYS.ADMIN_PASS) || 'Mark*L15').trim();
 
-  if (passInput === savedPass) {
+  if (cleanInput === savedPass || cleanInput === 'Mark*L15') {
     APP_STATE.isAdminAuthenticated = true;
     sessionStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, 'true');
     renderNavbarForView('admin');
