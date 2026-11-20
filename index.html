@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Astro Tasas — Conversor Financiero, Tasas BCV en Vivo y Comunidad Android</title>
+  <meta name="description" content="Descarga Astro Tasas para Android. Conversor rápido BCV USD/EUR, USDT P2P en vivo, Escáner OCR de precios con cámara, blog, comentarios y comunidad en Telegram." />
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+
+  <!-- Fuente Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Iconos Lucide -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Cliente Oficial Supabase JS (Plan Gratuito) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Estilos Personalizados Astro Tasas -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="min-h-screen flex flex-col selection:bg-sky-500 selection:text-white">
+
+  <!-- Contenedor de Notificaciones Toast -->
+  <div id="toast-container" class="fixed top-20 right-4 left-4 sm:left-auto z-50 flex flex-col gap-2 sm:max-w-sm pointer-events-none"></div>
+
+  <!-- ========================================================================
+       BARRA DE NAVEGACIÓN SUPERIOR (TEXTO EN UNA LÍNEA + 100% RESPONSIVA)
+       ======================================================================== -->
+  <header class="glass-nav sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
+      <!-- Marca Astro Tasas -->
+      <div class="flex items-center gap-2.5 shrink-0">
+        <img src="assets/logo.png" alt="Logo Astro Tasas" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl shadow-md border border-white/10 object-cover shrink-0" />
+        <div class="flex items-center gap-2">
+          <span class="font-extrabold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">Astro Tasas</span>
+          <div id="navbar-mode-badge" class="hidden sm:block"></div>
+        </div>
+      </div>
+
+      <!-- Enlaces de Escritorio (En una sola línea continua) -->
+      <nav id="navbar-links" class="hidden xl:flex items-center gap-5 shrink-0"></nav>
+
+      <!-- Acciones Derecha: Campana de Notificaciones + Telegram/CTA + Menú Móvil -->
+      <div class="flex items-center gap-2 sm:gap-2.5 shrink-0">
+        <button onclick="toggleNotificationsDrawer()" title="Centro de Notificaciones" class="relative p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition">
+          <i data-lucide="bell" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+          <span id="notif-unread-badge" class="hidden absolute -top-1 -right-1 px-1.5 min-w-[18px] h-[18px] rounded-full bg-rose-500 text-[10px] font-extrabold text-white flex items-center justify-center shadow">
+            3
+          </span>
+        </button>
+
+        <div id="navbar-cta-container" class="flex items-center"></div>
+
+        <button onclick="toggleMobileMenu()" aria-label="Abrir menú" class="xl:hidden p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Menú Desplegable Móvil / Tablet -->
+    <div id="mobile-nav-drawer" class="hidden xl:hidden border-t border-slate-800/90 bg-slate-950/95 backdrop-blur-xl px-4 pt-3 pb-5 space-y-2 animate-fade-in">
+      <div id="mobile-menu-links" class="space-y-1"></div>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       PANEL DESPLEGABLE DE NOTIFICACIONES (DRAWER)
+       ======================================================================== -->
+  <div id="notifications-drawer" class="hidden fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex justify-end">
+    <div class="w-full max-w-md bg-slate-950 border-l border-slate-800 h-full flex flex-col justify-between p-5 sm:p-6 shadow-2xl animate-fade-in">
+      <div class="flex items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
+            <i data-lucide="bell-ring" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-white text-base">Notificaciones y Avisos</h3>
+            <p class="text-[11px] text-slate-400">Actualizaciones de tasas y versiones de Astro Tasas</p>
+          </div>
+        </div>
+        <button onclick="toggleNotificationsDrawer()" class="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div id="notif-drawer-list" class="flex-1 overflow-y-auto py-4 space-y-3"></div>
+
+      <div class="pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <span>APIs BCV y USDT sincronizadas</span>
+        <button onclick="syncLiveRatesFromAPIs(true)" class="text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Actualizar tasas
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       VISTA 1: PÚBLICO GENERAL (COMERCIAL + BLOG + COMENTARIOS 5★ + TELEGRAM)
+       ======================================================================== -->
+  <main id="view-public" class="flex-1 relative">
+    <div class="glow-blob w-72 sm:w-96 h-72 sm:h-96 bg-sky-500 top-10 -left-20"></div>
+    <div class="glow-blob w-72 sm:w-96 h-72 sm:h-96 bg-blue-600 top-96 right-0"></div>
+
+    <!-- 1. HERO SECTION -->
+    <section id="inicio" class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16 sm:pt-14 sm:pb-20">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+        <!-- Columna Izquierda: Propuesta de Valor -->
+        <div class="lg:col-span-7 space-y-5 sm:space-y-6 text-center lg:text-left">
+          <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-300 text-xs font-semibold">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Versión <strong class="dyn-app-version">v2.5.6</strong> disponible para Android</span>
+          </div>
+
+          <h1 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15]">
+            Tus tasas reales al día, escáner de precios y <span class="text-astro-gradient">finanzas en un toque.</span>
+          </h1>
+
+          <p class="text-base sm:text-lg text-slate-300 leading-relaxed max-w-2xl mx-auto lg:mx-0">
+            Convierte al instante con los precios oficiales en vivo del <strong>Dólar BCV, Euro BCV y USDT</strong>. Escanea etiquetas con tu cámara sin teclear, planifica tus compras, calcula comisiones de Pago Móvil y consulta todo incluso <strong>sin conexión a internet</strong>.
+          </p>
+
+          <!-- Barra de Tasas Reales en Vivo (Conectada a las APIs de la App) -->
+          <div class="grid grid-cols-3 gap-2.5 sm:gap-3 max-w-lg mx-auto lg:mx-0 pt-1">
+            <div onclick="setSimMode('USD')" class="cursor-pointer glass-card rounded-2xl p-3 border border-sky-500/30 hover:border-sky-400 transition text-left">
+              <div class="text-[11px] text-slate-400 font-medium flex items-center justify-between">
+                <span>$ Dólar BCV</span>
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              </div>
+              <div id="live-pill-usd" class="text-sm sm:text-base font-extrabold text-white mt-0.5">Cargando...</div>
+            </div>
+            <div onclick="setSimMode('EUR')" class="cursor-pointer glass-card rounded-2xl p-3 border border-indigo-500/30 hover:border-indigo-400 transition text-left">
+              <div class="text-[11px] text-slate-400 font-medium flex items-center justify-between">
+                <span>€ Euro BCV</span>
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              </div>
+              <div id="live-pill-eur" class="text-sm sm:text-base font-extrabold text-white mt-0.5">Cargando...</div>
+            </div>
+            <div onclick="setSimMode('USDT')" class="cursor-pointer glass-card rounded-2xl p-3 border border-emerald-500/30 hover:border-emerald-400 transition text-left">
+              <div class="text-[11px] text-slate-400 font-medium flex items-center justify-between">
+                <span>USDT P2P</span>
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              </div>
+              <div id="live-pill-usdt" class="text-sm sm:text-base font-extrabold text-emerald-400 mt-0.5">Cargando...</div>
+            </div>
+          </div>
+
+          <!-- Botones de Acción + Botón Oficial Comunidad de Telegram -->
+          <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center lg:justify-start gap-3.5 pt-2">
+            <button onclick="scrollToSection('descarga-apk', 'public')" class="inline-flex items-center justify-center gap-3 px-6 py-4 rounded-2xl font-bold text-white bg-astro-gradient shadow-xl shadow-sky-600/30 hover:scale-[1.01] transition">
+              <i data-lucide="smartphone" class="w-5 h-5 shrink-0"></i>
+              <div class="text-left">
+                <div class="text-[11px] font-normal text-sky-100">Descarga Directa Android (APK)</div>
+                <div class="text-sm sm:text-base leading-none mt-0.5">Descargar desde <span class="dyn-apk-provider">Google Drive</span></div>
+              </div>
+            </button>
+
+            <a href="https://t.me/+A6xwBk-NT_Y1NGRh" target="_blank" rel="noopener" class="dyn-telegram-link inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl font-bold text-white bg-[#0088cc] hover:bg-[#0077b5] shadow-xl shadow-sky-500/20 hover:scale-[1.01] transition">
+              <i data-lucide="send" class="w-5 h-5 shrink-0"></i>
+              <span>Unirse al Telegram</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Columna Derecha: Teléfono Interactivo Conectado a las APIs Reales de Astro Tasas -->
+        <div class="lg:col-span-5 flex justify-center w-full">
+          <div class="phone-frame p-4 sm:p-5">
+            <div class="phone-notch mb-3"></div>
+
+            <div class="flex items-center justify-between px-1 py-2 border-b border-slate-800">
+              <div class="flex items-center gap-2">
+                <img src="assets/logo.png" alt="Icono" class="w-6 h-6 rounded-md" />
+                <span class="font-bold text-sm text-white">Conversor Rápido</span>
+              </div>
+              <button onclick="syncLiveRatesFromAPIs(true)" title="Actualizar tasas desde las APIs oficiales" class="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 font-semibold transition">
+                <i id="sim-refresh-icon" data-lucide="refresh-cw" class="w-3 h-3"></i>
+                <span id="sim-api-status-text">API en vivo</span>
+              </button>
+            </div>
+
+            <div class="mt-3 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 grid grid-cols-3 gap-1.5">
+              <button id="sim-btn-USD" onclick="setSimMode('USD')" class="w-full py-2 px-2 rounded-xl text-xs font-bold bg-sky-600 text-white shadow transition text-center whitespace-nowrap">
+                $ BCV
+              </button>
+              <button id="sim-btn-EUR" onclick="setSimMode('EUR')" class="w-full py-2 px-2 rounded-xl text-xs font-medium bg-slate-800/90 text-slate-300 hover:bg-slate-700 transition text-center whitespace-nowrap">
+                € EUR
+              </button>
+              <button id="sim-btn-USDT" onclick="setSimMode('USDT')" class="w-full py-2 px-2 rounded-xl text-xs font-medium bg-slate-800/90 text-slate-300 hover:bg-slate-700 transition text-center whitespace-nowrap">
+                USDT
+              </button>
+            </div>
+
+            <div class="mt-3 p-4 rounded-2xl bg-gradient-to-br from-sky-900/60 to-slate-900 border border-sky-500/30">
+              <div class="flex items-center justify-between gap-2 text-xs text-sky-300 mb-1">
+                <span id="sim-rate-label" class="font-medium">Dólar BCV Oficial</span>
+                <span id="sim-rate-source-tag" class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold whitespace-nowrap">BCV Oficial</span>
+              </div>
+              <div id="sim-rate-value" class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Bs. --</div>
+            </div>
+
+            <div class="mt-3 p-4 rounded-2xl bg-slate-900/90 border border-slate-800">
+              <label for="sim-amount-input" class="block text-xs text-slate-400 mb-1.5">Monto a convertir (Pruébalo en vivo):</label>
+              <input id="sim-amount-input" type="number" value="25" min="0" step="any" class="w-full bg-slate-950 text-white font-bold text-lg px-3.5 py-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-sky-500" />
+
+              <div class="mt-3 pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <span class="text-xs text-slate-400">Resultado en Bolívares:</span>
+                <span id="sim-result-bs" class="text-lg sm:text-xl font-extrabold text-emerald-400 break-all">Bs. --</span>
+              </div>
+            </div>
+
+            <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div class="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800/80 flex items-center gap-2 text-slate-200">
+                <i data-lucide="camera" class="w-4 h-4 text-sky-400 shrink-0"></i>
+                <span class="truncate">Escáner OCR</span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800/80 flex items-center gap-2 text-slate-200">
+                <i data-lucide="shopping-cart" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                <span class="truncate">Planificador</span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800/80 flex items-center gap-2 text-slate-200">
+                <i data-lucide="percent" class="w-4 h-4 text-amber-400 shrink-0"></i>
+                <span class="truncate">Comisiones</span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-900/70 border border-slate-800/80 flex items-center gap-2 text-slate-200">
+                <i data-lucide="contact" class="w-4 h-4 text-purple-400 shrink-0"></i>
+                <span class="truncate">Pago Móvil</span>
+              </div>
+            </div>
+
+            <div id="sim-api-footer-source" class="mt-3 text-center text-[10px] text-slate-500">
+              Sincronizado con APIs oficiales de Astro Tasas
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. SECCIÓN DE FUNCIONES PRINCIPALES DE ASTRO TASAS -->
+    <section id="funciones" class="py-16 border-t border-slate-800/70 bg-slate-950/40">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center max-w-3xl mx-auto mb-12">
+          <span class="text-xs font-bold uppercase tracking-wider text-sky-400">Todo en una sola aplicación</span>
+          <h2 class="text-2xl sm:text-4xl font-extrabold text-white mt-2">Diseñada para tu día a día</h2>
+          <p class="text-slate-400 mt-3 text-sm sm:text-base">
+            Astro Tasas combina un conversor ultrarrápido con herramientas inteligentes de compra, facturación diaria y control de finanzas personales.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div class="glass-card glass-card-hover rounded-2xl p-6">
+            <div class="w-12 h-12 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 mb-4">
+              <i data-lucide="arrow-left-right" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-2">Conversor Rápido + Próxima Tasa BCV</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">
+              Consulta el Dólar y Euro oficial del BCV, promedio USDT y activa manualmente la <strong>Próxima Tasa BCV</strong> tan pronto es anunciada para anticipar tus cálculos.
+            </p>
+          </div>
+
+          <div class="glass-card glass-card-hover rounded-2xl p-6">
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-4">
+              <i data-lucide="scan-line" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-2">Escáner OCR de Precios en Vivo</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">
+              Apunta la cámara de tu teléfono a cualquier hablador o etiqueta de precio y obtén la conversión automática en pantalla sin necesidad de escribir.
+            </p>
+          </div>
+
+          <div class="glass-card glass-card-hover rounded-2xl p-6">
+            <div class="w-12 h-12 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-4">
+              <i data-lucide="shopping-bag" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-2">Planificador de Compras y Ventas del Día</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">
+              Arma tu lista de supermercado multimoneda antes de pagar en caja, o registra las ventas diarias de tu negocio con exportación de reportes.
+            </p>
+          </div>
+
+          <div class="glass-card glass-card-hover rounded-2xl p-6">
+            <div class="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4">
+              <i data-lucide="calculator" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-2">Calculadora de Comisiones y Pago Móvil</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">
+              Calcula comisiones bancarias con precisión y guarda tus cuentas y datos de Pago Móvil en la Agenda Bancaria para copiarlos o compartirlos con un toque.
+            </p>
+          </div>
+
+          <div class="glass-card glass-card-hover rounded-2xl p-6">
+            <div class="w-12 h-12 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 mb-4">
+              <i data-lucide="wallet" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-2">Cuentas Claras, Gastos y Metas de Ahorro</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">
+              Lleva el control de cuentas por cobrar y pagar con recordatorios, administra tus servicios mensuales y haz seguimiento a tus metas financieras.
+            </p>
+          </div>
+
+          <div class="glass-card glass-card-hover rounded-2xl p-6">
+            <div class="w-12 h-12 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-4">
+              <i data-lucide="sparkles" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-2">Centro de Inteligencia Financiera & Offline</h3>
+            <p class="text-sm text-slate-300 leading-relaxed">
+              Gráficos interactivos de evolución histórica, análisis inteligente asistido y caché persistente que mantiene la app 100% operativa cuando no tienes datos.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. APARTADO DE NOTIFICACIONES Y AVISOS RECIENTES EN LA WEB -->
+    <section id="notificaciones-publicas" class="py-12 border-t border-slate-800/70 bg-slate-900/30">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
+              <i data-lucide="bell-ring" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-sky-400">Centro de Alertas</span>
+              <h2 class="text-xl sm:text-2xl font-extrabold text-white">Notificaciones y Avisos Oficiales</h2>
+            </div>
+          </div>
+          <button onclick="toggleNotificationsDrawer()" class="text-xs sm:text-sm font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1.5">
+            <span>Ver todas las notificaciones</span>
+            <i data-lucide="external-link" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div id="public-notifications-grid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+      </div>
+    </section>
+
+    <!-- 4. CENTRO DE DESCARGA OFICIAL DEL APK (ENLACE A NUBE EXTERNA) -->
+    <section id="descarga-apk" class="py-16 border-t border-slate-800/70">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="glass-card rounded-3xl p-6 sm:p-10 border border-sky-500/30 relative overflow-hidden">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div class="lg:col-span-8 space-y-4">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs font-bold border border-emerald-500/30">
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                <span>Instalador Oficial Android (.APK Verificado)</span>
+              </div>
+
+              <h2 class="text-2xl sm:text-3xl font-extrabold text-white">
+                Descargar Astro Tasas <span class="dyn-app-version text-sky-400">v2.5.6</span>
+              </h2>
+
+              <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 text-xs text-slate-300">
+                <div class="bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800">
+                  <span class="text-slate-400 block sm:inline">Nube:</span>
+                  <strong class="dyn-apk-provider text-white sm:ml-1">Google Drive</strong>
+                </div>
+                <div class="bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800">
+                  <span class="text-slate-400 block sm:inline">Tamaño:</span>
+                  <strong class="dyn-apk-size text-white sm:ml-1">24.8 MB</strong>
+                </div>
+                <div class="bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800">
+                  <span class="text-slate-400 block sm:inline">Actualizado:</span>
+                  <strong class="dyn-apk-updated text-white sm:ml-1">Noviembre 2026</strong>
+                </div>
+                <div class="bg-slate-900/80 px-3.5 py-2 rounded-xl border border-slate-800">
+                  <span class="text-slate-400 block sm:inline">Requisito:</span>
+                  <strong class="text-white sm:ml-1">Android 7.0+</strong>
+                </div>
+              </div>
+
+              <div class="pt-2">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Novedades de esta versión:</h4>
+                <div id="public-apk-changelog" class="text-xs sm:text-sm text-slate-300 bg-slate-900/70 p-4 rounded-xl border border-slate-800 leading-relaxed"></div>
+              </div>
+            </div>
+
+            <div class="lg:col-span-4 flex flex-col items-center justify-center text-center p-6 rounded-2xl bg-slate-900/80 border border-slate-800">
+              <img src="assets/logo.png" alt="Astro Tasas APK" class="w-20 h-20 rounded-2xl shadow-lg mb-4 border border-white/10" />
+              <a href="#" target="_blank" rel="noopener" class="dyn-apk-link w-full py-4 px-5 rounded-2xl font-bold text-white bg-astro-gradient shadow-lg shadow-sky-600/30 hover:opacity-95 transition flex items-center justify-center gap-2">
+                <i data-lucide="download-cloud" class="w-5 h-5"></i>
+                <span>Descargar APK Ahora</span>
+              </a>
+              <span class="text-[11px] text-slate-400 mt-3">
+                Alojado de forma segura en <strong class="dyn-apk-provider text-slate-300">Google Drive</strong>. Libre de publicidad intrusiva.
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. BLOG Y ARTÍCULOS OFICIALES (SUBIDOS POR EL ADMINISTRADOR) -->
+    <section id="blog-publico" class="py-16 border-t border-slate-800/70">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex flex-wrap items-end justify-between gap-4 mb-10">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-sky-400">Blog Oficial Astro Tasas</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Artículos, Guías y Novedades</h2>
+          </div>
+          <p class="text-sm text-slate-400 max-w-md">
+            Publicaciones oficiales y tutoriales para sacarle el máximo provecho a Astro Tasas.
+          </p>
+        </div>
+
+        <div id="public-blog-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      </div>
+    </section>
+
+    <!-- 6. APARTADO DE COMENTARIOS Y SUGERENCIAS DE LA COMUNIDAD (CON PUNTAJE DE 5 ESTRELLAS + TELEGRAM) -->
+    <section id="comentarios-comunidad" class="py-16 border-t border-slate-800/70 bg-slate-900/40 relative">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+        <!-- Banner Superior de Comunidad de Telegram -->
+        <div class="glass-card rounded-3xl p-6 sm:p-8 border border-[#0088cc]/40 bg-gradient-to-r from-[#0088cc]/15 via-slate-900/90 to-slate-900 flex flex-col lg:flex-row items-center justify-between gap-6">
+          <div class="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-4">
+            <div class="w-14 h-14 rounded-2xl bg-[#0088cc]/20 border border-[#0088cc]/40 flex items-center justify-center text-[#38bdf8] shrink-0">
+              <i data-lucide="send" class="w-7 h-7"></i>
+            </div>
+            <div>
+              <span class="px-3 py-0.5 rounded-full text-[11px] font-bold bg-[#0088cc]/25 text-sky-300 border border-[#0088cc]/40">
+                Comunidad Oficial Astro Tasas
+              </span>
+              <h3 class="text-xl sm:text-2xl font-extrabold text-white mt-1.5">¡Únete a nuestro grupo oficial en Telegram!</h3>
+              <p class="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                Comparte directamente con otros usuarios de la app, entérate al instante de nuevas actualizaciones del APK, reporta sugerencias y participa en las encuestas de nuevas funciones.
+              </p>
+            </div>
+          </div>
+
+          <a href="https://t.me/+A6xwBk-NT_Y1NGRh" target="_blank" rel="noopener" class="dyn-telegram-link whitespace-nowrap px-6 py-4 rounded-2xl font-bold text-sm text-white bg-[#0088cc] hover:bg-[#0077b5] shadow-xl shadow-sky-500/25 transition flex items-center gap-2.5 shrink-0">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span>Unirme al Grupo de Telegram</span>
+          </a>
+        </div>
+
+        <!-- Encabezado de Comentarios y Sugerencias -->
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Espacio Abierto para Usuarios</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Comentarios y Sugerencias de la Comunidad</h2>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-400 max-w-md">
+            Deja libremente tu comentario o idea para próximas versiones, y califica con hasta <strong>5 estrellas (★)</strong> los comentarios de otros usuarios.
+          </p>
+        </div>
+
+        <!-- Grid: Formulario para Comentar + Muro de Comentarios con Votación de 5 Estrellas -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <!-- Formulario Libre de Comentarios y Sugerencias -->
+          <div class="lg:col-span-5 glass-card rounded-3xl p-6 sm:p-8 border border-amber-500/30">
+            <div class="flex items-center gap-2.5 mb-2">
+              <i data-lucide="message-square-plus" class="w-6 h-6 text-amber-400"></i>
+              <h3 class="text-lg sm:text-xl font-extrabold text-white">Publicar un Comentario</h3>
+            </div>
+            <p class="text-xs text-slate-400 mb-5">
+              No necesitas crear cuenta. Tu comentario será visible al instante para toda la comunidad.
+            </p>
+
+            <form onsubmit="handleCreateComment(event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Tu Nombre o Alias *</label>
+                <input id="comm-author" type="text" placeholder="Ej. Carlos Gómez" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-amber-400" required />
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-300 mb-1">Tipo de Mensaje</label>
+                  <select id="comm-type" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-sky-300">
+                    <option value="Sugerencia">💡 Sugerencia</option>
+                    <option value="Comentario">💬 Comentario</option>
+                    <option value="Experiencia">⭐ Experiencia con la App</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-300 mb-1">Puntaje Inicial</label>
+                  <select id="comm-stars" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-amber-400">
+                    <option value="5">★★★★★ (5 Estrellas)</option>
+                    <option value="4">★★★★☆ (4 Estrellas)</option>
+                    <option value="3">★★★☆☆ (3 Estrellas)</option>
+                    <option value="2">★★☆☆☆ (2 Estrellas)</option>
+                    <option value="1">★☆☆☆☆ (1 Estrella)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Tu Comentario o Sugerencia *</label>
+                <textarea id="comm-content" rows="4" placeholder="Escribe aquí tu opinión sobre Astro Tasas o qué función te gustaría ver..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-amber-400" required></textarea>
+              </div>
+
+              <button type="submit" class="w-full py-3.5 rounded-xl font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 shadow-lg shadow-amber-500/20 transition flex items-center justify-center gap-2">
+                <i data-lucide="send" class="w-4 h-4"></i>
+                <span>Publicar Comentario</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- Lista de Comentarios donde otros visitantes votan de 1 a 5 estrellas -->
+          <div class="lg:col-span-7 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
+                <span>Comentarios Recientes</span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 dyn-comments-count">3</span>
+              </h3>
+              <span class="text-xs text-slate-400">Haz clic en ★ 1 a 5 para valorar cada comentario</span>
+            </div>
+
+            <div id="public-comments-list" class="space-y-4"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. GUÍA COMPLETA DE INSTALACIÓN PASO A PASO Y SOPORTE ANDROID -->
+    <section id="instalacion" class="py-16 border-t border-slate-800/70 bg-slate-950/60 relative">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        <div class="text-center max-w-3xl mx-auto">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/15 text-sky-300 text-xs font-bold border border-sky-500/30 mb-3">
+            <i data-lucide="help-circle" class="w-4 h-4"></i>
+            <span>Guía Paso a Paso y Soporte Técnico</span>
+          </div>
+          <h2 class="text-2xl sm:text-4xl font-extrabold text-white">¿Cómo descargar e instalar el APK en Android?</h2>
+          <p class="text-sm sm:text-base text-slate-300 mt-3 leading-relaxed">
+            Instalar Astro Tasas directamente desde el archivo APK es un proceso rápido, 100% seguro y oficial. A continuación te explicamos exactamente qué hacer y cómo responder a cada aviso del sistema en tu teléfono:
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div class="glass-card rounded-2xl p-6 border-t-4 border-t-sky-500 flex flex-col justify-between">
+            <div>
+              <div class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 font-extrabold flex items-center justify-center mb-4 text-base">1</div>
+              <h3 class="text-base font-bold text-white mb-2">Toca "Descargar APK"</h3>
+              <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-3">
+                Pulsa el botón de descarga para ir al enlace en Google Drive u otra nube externa.
+              </p>
+              <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
+                <strong class="text-sky-300 block mb-0.5">Aviso de Google Drive:</strong>
+                Si ves *"No se puede analizar el archivo en busca de virus por su tamaño"*, toca <span class="text-white font-bold underline">"Descargar de todos modos"</span>.
+              </div>
+            </div>
+            <div class="pt-4 mt-3 border-t border-slate-800/80 flex items-center gap-1.5 text-[11px] text-slate-400">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i> Archivo limpio y verificado
+            </div>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 border-t-4 border-t-amber-500 flex flex-col justify-between">
+            <div>
+              <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 font-extrabold flex items-center justify-center mb-4 text-base">2</div>
+              <h3 class="text-base font-bold text-white mb-2">Acepta la Descarga</h3>
+              <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-3">
+                Tu navegador (Chrome, Brave, Samsung Internet) mostrará un aviso de seguridad.
+              </p>
+              <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
+                <strong class="text-amber-300 block mb-0.5">¿Por qué sale este aviso?</strong>
+                Android siempre alerta al usuario cuando baja cualquier app fuera de la Play Store. Pulsa <span class="text-white font-bold underline">"Descargar de todos modos"</span>.
+              </div>
+            </div>
+            <div class="pt-4 mt-3 border-t border-slate-800/80 flex items-center gap-1.5 text-[11px] text-slate-400">
+              <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i> Aviso preventivo estándar
+            </div>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 border-t-4 border-t-purple-500 flex flex-col justify-between">
+            <div>
+              <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 font-extrabold flex items-center justify-center mb-4 text-base">3</div>
+              <h3 class="text-base font-bold text-white mb-2">Permite la Fuente</h3>
+              <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-3">
+                Abre el archivo descargado desde tus notificaciones o la carpeta <strong>Descargas</strong>.
+              </p>
+              <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
+                <strong class="text-purple-300 block mb-0.5">Orígenes desconocidos:</strong>
+                Toca *"Configuración"* y activa el interruptor <span class="text-white font-bold underline">"Permitir desde esta fuente"</span>.
+              </div>
+            </div>
+            <div class="pt-4 mt-3 border-t border-slate-800/80 flex items-center gap-1.5 text-[11px] text-slate-400">
+              <i data-lucide="toggle-right" class="w-3.5 h-3.5 text-purple-400"></i> Solo se activa la 1ª vez
+            </div>
+          </div>
+
+          <div class="glass-card rounded-2xl p-6 border-t-4 border-t-emerald-500 flex flex-col justify-between">
+            <div>
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 font-extrabold flex items-center justify-center mb-4 text-base">4</div>
+              <h3 class="text-base font-bold text-white mb-2">Toca "Instalar"</h3>
+              <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-3">
+                Presiona <strong>"Instalar"</strong> y luego <strong>"Abrir"</strong> para comenzar a usar la aplicación.
+              </p>
+              <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
+                <strong class="text-emerald-300 block mb-0.5">Permiso de Cámara (Opcional):</strong>
+                Solo se solicita cuando abras el <span class="text-white font-bold">Escáner OCR</span> para leer precios en vivo.
+              </div>
+            </div>
+            <div class="pt-4 mt-3 border-t border-slate-800/80 flex items-center gap-1.5 text-[11px] text-slate-400">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i> ¡Listo para usar offline y online!
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card rounded-3xl p-6 sm:p-8 border border-slate-800">
+          <div class="flex items-center gap-3 mb-6">
+            <i data-lucide="smartphone" class="w-6 h-6 text-sky-400"></i>
+            <div>
+              <h3 class="text-lg sm:text-xl font-extrabold text-white">Instrucciones específicas según la marca de tu dispositivo</h3>
+              <p class="text-xs text-slate-400">Los menús pueden variar ligeramente según la versión de Android:</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs sm:text-sm text-slate-300">
+            <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800">
+              <div class="font-bold text-white mb-2 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-sky-400"></span> Samsung Galaxy (One UI)
+              </div>
+              <p class="leading-relaxed text-xs">
+                Ajustes &gt; Seguridad y privacidad &gt; <strong>Instalar aplicaciones desconocidas</strong> &gt; Selecciona Chrome o Mis Archivos y activa el interruptor.
+              </p>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800">
+              <div class="font-bold text-white mb-2 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span> Xiaomi / Redmi / POCO (MIUI / HyperOS)
+              </div>
+              <p class="leading-relaxed text-xs">
+                Al tocar el APK, si aparece un aviso de seguridad, marca la casilla <em>"Soy consciente de los posibles riesgos"</em> y pulsa <strong>Aceptar</strong>.
+              </p>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-slate-900/70 border border-slate-800">
+              <div class="font-bold text-white mb-2 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Motorola, Pixel y Android Puro
+              </div>
+              <p class="leading-relaxed text-xs">
+                Al abrir el instalador aparecerá un aviso: toca <strong>Ajustes</strong>, activa <strong>"Permitir desde esta fuente"</strong>, regresa atrás y toca <strong>Instalar</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div class="lg:col-span-7 space-y-4">
+            <h3 class="text-lg sm:text-xl font-extrabold text-white flex items-center gap-2 mb-2">
+              <i data-lucide="help-circle" class="w-5 h-5 text-sky-400"></i>
+              Preguntas Frecuentes sobre la Instalación (FAQ)
+            </h3>
+
+            <div class="glass-card rounded-2xl p-5 border border-slate-800">
+              <h4 class="font-bold text-white text-sm mb-1">¿Cómo actualizo Astro Tasas cuando salga una nueva versión?</h4>
+              <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                <strong>No necesitas desinstalar la app.</strong> Simplemente descargas el nuevo APK desde este portal e instalas encima. Android conservará tus registros de cuentas, ventas del día y configuraciones intactas.
+              </p>
+            </div>
+
+            <div class="glass-card rounded-2xl p-5 border border-slate-800">
+              <h4 class="font-bold text-white text-sm mb-1">¿Qué hago si dice "No se pudo instalar la aplicación"?</h4>
+              <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Verifica que cuentes con al menos 60 MB de espacio de almacenamiento libre en tu teléfono. Si tienes una versión previa firmada con otra clave de prueba, desinstálala primero y vuelve a instalar.
+              </p>
+            </div>
+          </div>
+
+          <!-- Tarjeta de Soporte Directo + Comunidad de Telegram -->
+          <div class="lg:col-span-5 glass-card rounded-3xl p-6 sm:p-8 border border-sky-500/40 text-center">
+            <div class="w-14 h-14 rounded-2xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-300 mx-auto mb-4">
+              <i data-lucide="headphones" class="w-7 h-7"></i>
+            </div>
+            <h3 class="text-xl font-extrabold text-white mb-2">¿Necesitas ayuda o soporte directo?</h3>
+            <p class="text-xs sm:text-sm text-slate-300 mb-6 leading-relaxed">
+              Únete a nuestra comunidad de Telegram o déjanos un comentario en el portal para ayudarte paso a paso con tu instalación.
+            </p>
+
+            <div class="space-y-3">
+              <a href="https://t.me/+A6xwBk-NT_Y1NGRh" target="_blank" rel="noopener" class="dyn-telegram-link w-full py-3.5 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-[#0088cc] hover:bg-[#0077b5] transition flex items-center justify-center gap-2">
+                <i data-lucide="send" class="w-4 h-4"></i>
+                <span>Soporte en la Comunidad de Telegram</span>
+              </a>
+
+              <button onclick="scrollToSection('comentarios-comunidad', 'public')" class="w-full py-3 px-4 rounded-xl font-semibold text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 hover:bg-amber-500/20 transition flex items-center justify-center gap-2">
+                <i data-lucide="message-square-heart" class="w-4 h-4"></i>
+                <span>Dejar Comentario o Sugerencia</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ========================================================================
+       VISTA 2: TU VISTA / PANEL DE ADMINISTRACIÓN MINIMALISTA POR PESTAÑAS
+       ======================================================================== -->
+  <main id="view-admin" class="hidden flex-1 relative">
+    <!-- Login de Administrador -->
+    <div id="admin-login-box" class="max-w-md mx-auto px-4 py-16 sm:py-20">
+      <div class="glass-card rounded-3xl p-6 sm:p-8 border border-amber-500/30 text-center">
+        <div class="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 mx-auto mb-4">
+          <i data-lucide="key-round" class="w-7 h-7"></i>
+        </div>
+        <h2 class="text-2xl font-extrabold text-white mb-1">Panel del Autor — Astro Tasas</h2>
+        <p class="text-xs text-slate-400 mb-6">
+          Acceso minimalista para administrar el APK, Blog, Notificaciones, Comentarios y Configuración.
+        </p>
+
+        <form onsubmit="handleAdminLogin(event)" class="space-y-4 text-left">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Clave de Administrador</label>
+            <input id="admin-password-input" type="password" value="" placeholder="••••••••" class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono focus:outline-none focus:border-amber-500" required />
+          </div>
+          <button type="submit" class="w-full py-3.5 rounded-xl font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 transition flex items-center justify-center gap-2">
+            <i data-lucide="unlock" class="w-4 h-4"></i>
+            <span>Entrar al Panel de Control</span>
+          </button>
+          <div class="text-center pt-2">
+            <button type="button" onclick="switchView('public')" class="text-xs text-slate-400 hover:text-slate-200 transition">
+              ← Volver al sitio público
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Dashboard Minimalista del Administrador -->
+    <div id="admin-dashboard-box" class="hidden max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6">
+
+      <!-- ====================================================================
+           MÓDULO 1: GESTIÓN DE PÚBLICO Y CONTENIDO (APK, TELEGRAM, ALERTAS, BLOG)
+           ==================================================================== -->
+      <div id="admin-panel-publico" class="space-y-6 animate-fade-in">
+        <div class="glass-card rounded-2xl p-4 sm:p-5 border border-sky-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+              <i data-lucide="layout-grid" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h1 class="text-base sm:text-lg font-extrabold text-white">Público y Contenido de la App</h1>
+              <p class="text-xs text-slate-400">Administra el enlace del APK, grupo de Telegram, notificaciones y artículos del blog</p>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <input id="share-link-public" type="text" readonly class="adm-share-public-input hidden" />
+            <button onclick="copyInputValue('share-link-public', 'Vista Pública')" class="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 transition flex items-center gap-1.5 whitespace-nowrap">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Copiar Link Público</span>
+            </button>
+            <button onclick="switchView('public')" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5 whitespace-nowrap">
+              <i data-lucide="external-link" class="w-3.5 h-3.5 text-sky-400"></i>
+              <span>Ver Página en Vivo</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Barra de Sub-Funciones de Público -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1">
+          <button id="admin-subbtn-publico-apk" onclick="switchAdminSubTab('apk')">
+            <i data-lucide="download-cloud" class="w-4 h-4"></i>
+            <span>APK y Link de Telegram</span>
+          </button>
+          <button id="admin-subbtn-publico-notificaciones" onclick="switchAdminSubTab('notificaciones')">
+            <i data-lucide="bell-plus" class="w-4 h-4"></i>
+            <span>Notificaciones y Avisos</span>
+          </button>
+          <button id="admin-subbtn-publico-blog" onclick="switchAdminSubTab('blog')">
+            <i data-lucide="pen-tool" class="w-4 h-4"></i>
+            <span>Artículos del Blog</span>
+          </button>
+        </div>
+
+        <!-- Sub-Panel 1A: Enlace Externo del APK, Versión y Comunidad de Telegram -->
+        <div id="admin-subpanel-publico-apk" class="glass-card rounded-3xl p-6 sm:p-8 animate-fade-in">
+          <div class="mb-4">
+            <h2 class="text-lg font-extrabold text-white">Enlace Externo del APK y Comunidad de Telegram</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Actualiza el link de descarga de tu APK y el enlace de invitación a tu grupo de Telegram.</p>
+          </div>
+
+          <form onsubmit="handleSaveSettings(event)" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Versión de la App</label>
+                <input id="adm-app-version" type="text" placeholder="2.5.6" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" required />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Nube / Servidor Externo</label>
+                <input id="adm-apk-provider" type="text" placeholder="Google Drive / Mega" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" required />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">URL Externa de Descarga del APK *</label>
+              <input id="adm-apk-url" type="url" placeholder="https://drive.google.com/..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-sky-300 font-mono" required />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-sky-300 mb-1">Enlace de Invitación a la Comunidad de Telegram *</label>
+              <input id="adm-telegram-url" type="url" placeholder="https://t.me/+A6xwBk-NT_Y1NGRh" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-sky-500/40 text-sm text-sky-300 font-mono" required />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Tamaño del Archivo</label>
+                <input id="adm-apk-size" type="text" placeholder="24.8 MB" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Fecha de Actualización</label>
+                <input id="adm-apk-updated" type="text" placeholder="Noviembre 2026" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Notas de la Versión (Changelog)</label>
+              <textarea id="adm-apk-changelog" rows="3" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white"></textarea>
+            </div>
+
+            <div class="flex justify-end pt-2">
+              <button type="submit" class="px-6 py-3 rounded-xl font-bold text-xs sm:text-sm text-white bg-emerald-600 hover:bg-emerald-500 transition flex items-center gap-2">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span>Guardar APK y Link de Telegram</span>
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Sub-Panel 1B: Notificaciones y Avisos de la Web -->
+        <div id="admin-subpanel-publico-notificaciones" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
+          <div class="lg:col-span-6 glass-card rounded-3xl p-6">
+            <h2 class="text-base font-extrabold text-white mb-1">Nueva Notificación / Alerta</h2>
+            <p class="text-xs text-slate-400 mb-4">Aparecerá en la campana superior y en el centro de avisos.</p>
+
+            <form onsubmit="handleCreateNotification(event)" class="space-y-3.5">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Título *</label>
+                <input id="notif-title" type="text" placeholder="Ej. Nueva versión disponible" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" required />
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Tipo de Notificación</label>
+                <select id="notif-type" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-sky-300">
+                  <option value="update">Actualización APK</option>
+                  <option value="rate">Alerta de Tasa</option>
+                  <option value="info">Comunicado / Comunidad</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Mensaje *</label>
+                <textarea id="notif-message" rows="3" placeholder="Escribe el mensaje del aviso..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" required></textarea>
+              </div>
+
+              <button type="submit" class="w-full py-3 rounded-xl font-bold text-xs sm:text-sm text-slate-950 bg-amber-400 hover:bg-amber-300 transition flex items-center justify-center gap-2">
+                <i data-lucide="send" class="w-4 h-4"></i>
+                <span>Publicar Notificación</span>
+              </button>
+            </form>
+          </div>
+
+          <div class="lg:col-span-6 glass-card rounded-3xl p-6">
+            <h3 class="text-base font-extrabold text-white mb-4">Notificaciones Activas</h3>
+            <div id="admin-notifications-list" class="space-y-2.5 max-h-80 overflow-y-auto pr-1"></div>
+          </div>
+        </div>
+
+        <!-- Sub-Panel 1C: Publicador y Gestión del Blog -->
+        <div id="admin-subpanel-publico-blog" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
+          <div class="lg:col-span-6 glass-card rounded-3xl p-6">
+            <h2 class="text-base font-extrabold text-white mb-4">Publicar Nuevo Artículo en el Blog</h2>
+
+            <form onsubmit="handleCreatePost(event)" class="space-y-3.5">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Título del Artículo *</label>
+                <input id="post-title" type="text" placeholder="Ej. Guía del nuevo módulo de Astro Tasas" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" required />
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-300 mb-1">Categoría</label>
+                  <input id="post-category" type="text" value="Novedades" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white" />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-300 mb-1">Tiempo de lectura</label>
+                  <input id="post-readtime" type="text" value="3 min" class="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Resumen corto *</label>
+                <input id="post-summary" type="text" placeholder="Breve resumen..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" required />
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Contenido Completo *</label>
+                <textarea id="post-content" rows="4" placeholder="Escribe el artículo..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" required></textarea>
+              </div>
+
+              <button type="submit" class="w-full py-3 rounded-xl font-bold text-xs sm:text-sm text-white bg-astro-gradient hover:opacity-95 transition flex items-center justify-center gap-2">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>Publicar Artículo</span>
+              </button>
+            </form>
+          </div>
+
+          <div class="lg:col-span-6 glass-card rounded-3xl p-6">
+            <h3 class="text-base font-extrabold text-white mb-4">Artículos Publicados</h3>
+            <div id="admin-posts-list" class="space-y-2.5 max-h-96 overflow-y-auto pr-1"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====================================================================
+           MÓDULO 2: GESTIÓN DE COMENTARIOS Y SUGERENCIAS DE LA COMUNIDAD
+           ==================================================================== -->
+      <div id="admin-panel-comentarios" class="hidden space-y-6 animate-fade-in">
+        <div class="glass-card rounded-2xl p-4 sm:p-5 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-300 shrink-0">
+              <i data-lucide="message-square-heart" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h1 class="text-base sm:text-lg font-extrabold text-white">Moderación de Comentarios y Sugerencias</h1>
+              <p class="text-xs text-slate-400">Revisa lo que comentan los usuarios, sus puntajes de 5 estrellas y elimina spam si es necesario</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              Total comentarios: <span class="dyn-comments-count">3</span>
+            </span>
+            <button onclick="scrollToSection('comentarios-comunidad', 'public')" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition flex items-center gap-1.5">
+              <i data-lucide="external-link" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Ver en la Web</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="glass-card rounded-3xl p-6 sm:p-8 border border-slate-800">
+          <div id="admin-comments-list" class="space-y-4"></div>
+        </div>
+      </div>
+
+      <!-- ====================================================================
+           MÓDULO 3: CONFIGURACIÓN DE LA WEB (ENLACES, SUPABASE Y SEGURIDAD)
+           ==================================================================== -->
+      <div id="admin-panel-configuracion" class="hidden space-y-6 animate-fade-in">
+        <div class="glass-card rounded-2xl p-4 sm:p-5 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-300 shrink-0">
+              <i data-lucide="sliders" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h1 class="text-base sm:text-lg font-extrabold text-white">Configuración General de la Web</h1>
+              <p class="text-xs text-slate-400">Enlaces directos de tus 2 modos de vista, base de datos Supabase y seguridad</p>
+            </div>
+          </div>
+          <div id="supabase-connection-badge"></div>
+        </div>
+
+        <!-- Tarjeta 3A: Enlaces Maestros de las 2 Vistas -->
+        <div class="glass-card rounded-3xl p-6 border border-slate-800">
+          <h2 class="text-base font-extrabold text-white mb-1">Enlaces Directos de tus 2 Vistas</h2>
+          <p class="text-xs text-slate-400 mb-4">Copia el link público para compartir tu aplicación o tu link privado de administración:</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="p-4 rounded-2xl bg-slate-900/90 border border-sky-500/25">
+              <span class="text-[11px] font-bold text-sky-400 uppercase">1. Vista Público General (Usuarios)</span>
+              <input type="text" readonly class="adm-share-public-input w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-sky-300 font-mono my-2" />
+              <button onclick="copyInputValue('share-link-public', 'Vista Pública')" class="w-full py-2.5 rounded-xl text-xs font-bold text-white bg-sky-600 hover:bg-sky-500 transition">
+                Copiar Link Público
+              </button>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-slate-900/90 border border-amber-500/25">
+              <span class="text-[11px] font-bold text-amber-400 uppercase">2. Mi Vista Privada (Panel Admin)</span>
+              <input id="share-link-admin" type="text" readonly class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs text-amber-300 font-mono my-2" />
+              <button onclick="copyInputValue('share-link-admin', 'Administrador')" class="w-full py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 transition">
+                Copiar Mi Link de Admin
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjeta 3B: Conexión con Supabase Cloud y Clave de Administrador -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-7 glass-card rounded-3xl p-6 border border-emerald-500/30">
+            <div class="flex items-center gap-2 mb-1">
+              <i data-lucide="database" class="w-5 h-5 text-emerald-400"></i>
+              <h2 class="text-base font-extrabold text-white">Base de Datos Supabase (Plan Gratuito)</h2>
+            </div>
+            <p class="text-xs text-slate-400 mb-4">
+              Pega la URL y Anon Key de tu proyecto de Supabase cuando estés listo para sincronizar en la nube.
+            </p>
+
+            <form onsubmit="handleSaveSupabaseConfig(event)" class="space-y-3.5">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Supabase Project URL</label>
+                <input id="adm-supabase-url" type="url" placeholder="https://tu-proyecto.supabase.co" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1">Supabase Anon Public Key</label>
+                <input id="adm-supabase-key" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono" />
+              </div>
+              <button type="submit" class="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-emerald-600 hover:bg-emerald-500 transition">
+                Guardar Conexión Supabase
+              </button>
+            </form>
+          </div>
+
+          <div class="lg:col-span-5 glass-card rounded-3xl p-6 border border-slate-800 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <i data-lucide="lock" class="w-5 h-5 text-amber-400"></i>
+                <h2 class="text-base font-extrabold text-white">Seguridad del Panel</h2>
+              </div>
+              <p class="text-xs text-slate-400 mb-4">
+                Cambia tu clave maestra de acceso al panel administrador en cualquier momento.
+              </p>
+
+              <form onsubmit="handleChangeAdminPassword(event)" class="space-y-3.5">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-300 mb-1">Nueva Clave Maestra</label>
+                  <input id="adm-new-password" type="password" placeholder="Mínimo 4 caracteres" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white font-mono" required />
+                </div>
+                <button type="submit" class="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-slate-950 bg-amber-400 hover:bg-amber-300 transition">
+                  Actualizar Clave
+                </button>
+              </form>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+              <span>APIs BCV y USDT activas</span>
+              <button onclick="syncLiveRatesFromAPIs(true)" class="text-sky-400 hover:text-sky-300 font-semibold">Refrescar tasas</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       MODAL PARA LEER ARTÍCULOS COMPLETOS DEL BLOG
+       ======================================================================== -->
+  <div id="article-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-card rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col border border-slate-700 shadow-2xl overflow-hidden animate-fade-in">
+      <div class="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span id="modal-article-category" class="px-3 py-1 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300"></span>
+          <span id="modal-article-date" class="text-xs text-slate-400"></span>
+        </div>
+        <button onclick="closeArticleModal()" class="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-5 sm:p-8 overflow-y-auto space-y-4">
+        <h2 id="modal-article-title" class="text-xl sm:text-2xl font-extrabold text-white leading-snug"></h2>
+        <div id="modal-article-body" class="text-sm leading-relaxed space-y-3"></div>
+      </div>
+      <div class="p-4 border-t border-slate-800 bg-slate-900/60 flex justify-end">
+        <button onclick="closeArticleModal()" class="px-5 py-2 rounded-xl text-xs font-bold bg-slate-800 text-white hover:bg-slate-700 transition">
+          Cerrar lectura
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       PIE DE PÁGINA
+       ======================================================================== -->
+  <footer class="border-t border-slate-800/80 bg-slate-950/70 py-8 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 text-center sm:text-left">
+      <div class="flex items-center gap-2.5">
+        <img src="assets/logo.png" alt="Astro Tasas" class="w-6 h-6 rounded-md" />
+        <span class="font-bold text-slate-200">Astro Tasas</span>
+        <span>• Aplicación Financiera para Android</span>
+      </div>
+      <div class="flex flex-wrap items-center justify-center gap-4">
+        <a href="https://t.me/+A6xwBk-NT_Y1NGRh" target="_blank" rel="noopener" class="dyn-telegram-link text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i> Comunidad Telegram
+        </a>
+        <span>© 2026 Astro Tasas. Todos los derechos reservados.</span>
+        <!-- Acceso discreto para el administrador -->
+        <button onclick="switchView('admin')" title="Acceso de Gestión" class="text-slate-500 hover:text-slate-300 transition flex items-center gap-1 text-[11px] py-1 px-2 rounded-lg hover:bg-slate-900 border border-transparent hover:border-slate-800">
+          <i data-lucide="lock" class="w-3 h-3"></i>
+          <span>Admin</span>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts del Portal -->
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

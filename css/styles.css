@@ -1,0 +1,138 @@
+/* ==========================================================================
+   ASTRO TASAS - ESTILOS DEL PORTAL WEB (100% RESPONSIVE & GLASSMORPHISM)
+   ========================================================================== */
+
+:root {
+  --brand-primary: #0061A4;
+  --brand-secondary: #3B82F6;
+  --trend-up: #00875A;
+  --trend-down: #D32F2F;
+  --glass-navy: #0F172A;
+  --glass-charcoal: #1E293B;
+  --glass-muted: #64748B;
+}
+
+* {
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+}
+
+html, body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #0B1120;
+  color: #F1F5F9;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* Efectos Glassmorphism */
+.glass-card {
+  background: rgba(30, 41, 59, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card-hover:hover {
+  transform: translateY(-4px);
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 20px 40px -15px rgba(0, 97, 164, 0.35);
+}
+
+.glass-nav {
+  background: rgba(11, 17, 32, 0.90);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Gradientes de Marca Astro Tasas */
+.bg-astro-gradient {
+  background: linear-gradient(135deg, #0061A4 0%, #2563EB 50%, #0EA5E9 100%);
+}
+
+.text-astro-gradient {
+  background: linear-gradient(135deg, #38BDF8 0%, #60A5FA 50%, #A855F7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.glow-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.22;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Mockup de Teléfono Android 100% Responsivo */
+.phone-frame {
+  width: 100%;
+  max-width: 350px;
+  border-radius: 36px;
+  border: 7px solid #1E293B;
+  background: #0F172A;
+  box-shadow: 0 25px 60px -15px rgba(2, 132, 199, 0.4), inset 0 0 0 1.5px rgba(255,255,255,0.08);
+  position: relative;
+  overflow: hidden;
+  margin: 0 auto;
+}
+
+.phone-notch {
+  width: 96px;
+  height: 18px;
+  background: #1E293B;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  margin: 0 auto;
+}
+
+/* Animaciones suaves */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.28s ease-out forwards;
+}
+
+/* Evitar números con spinner molesto en inputs */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Ajustes móviles para pantallas pequeñas */
+@media (max-width: 640px) {
+  .phone-frame {
+    max-width: 100%;
+    border-radius: 28px;
+    border-width: 5px;
+  }
+}
+
+/* Scrollbar elegante */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0B1120;
+}
+::-webkit-scrollbar-thumb {
+  background: #1E293B;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
