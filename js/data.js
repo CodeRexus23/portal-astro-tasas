@@ -256,6 +256,14 @@ class AstroLiveRatesService {
 }
 
 // ============================================================================
+// CONFIGURACIÓN OFICIAL DE SUPABASE (BASE DE DATOS EN LA NUBE)
+// ============================================================================
+const DEFAULT_SUPABASE_CONFIG = {
+  url: 'https://kxilovoovnbecneyjnkk.supabase.co',
+  anonKey: 'sb_publishable_6hQqAvYT4zaLutnbC5EFZA_EhER44HG'
+};
+
+// ============================================================================
 // CLIENTE DE DATOS (CONEXIÓN A SUPABASE + FALLBACK LOCAL AUTOMÁTICO)
 // ============================================================================
 class PortalDataService {
@@ -268,13 +276,16 @@ class PortalDataService {
   getSupabaseConfig() {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.SUPABASE_CFG);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.url && parsed.anonKey) return parsed;
+      }
     } catch (e) {}
-    return { url: '', anonKey: '' };
+    return { ...DEFAULT_SUPABASE_CONFIG };
   }
 
   saveSupabaseConfig(url, anonKey) {
-    const cleanUrl = (url || '').trim();
+    const cleanUrl = (url || '').trim().replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
     const cleanKey = (anonKey || '').trim();
     localStorage.setItem(STORAGE_KEYS.SUPABASE_CFG, JSON.stringify({ url: cleanUrl, anonKey: cleanKey }));
     return this.initSupabase();
@@ -282,9 +293,10 @@ class PortalDataService {
 
   initSupabase() {
     const cfg = this.getSupabaseConfig();
-    if (cfg.url && cfg.anonKey && window.supabase) {
+    const cleanUrl = (cfg.url || '').trim().replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+    if (cleanUrl && cfg.anonKey && window.supabase) {
       try {
-        this.supabase = window.supabase.createClient(cfg.url, cfg.anonKey);
+        this.supabase = window.supabase.createClient(cleanUrl, cfg.anonKey);
         this.isCloudConnected = true;
         return true;
       } catch (err) {
