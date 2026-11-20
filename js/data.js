@@ -12,7 +12,8 @@ const STORAGE_KEYS = {
   LIVE_RATES_CACHE: 'astrotasas_live_rates_cache_v3',
   SUPABASE_CFG: 'astrotasas_supabase_config_v1',
   ADMIN_AUTH: 'astrotasas_admin_session_v1',
-  ADMIN_PASS: 'astrotasas_admin_pass_v1'
+  ADMIN_PASS: 'astrotasas_admin_pass_v1',
+  DEVICE_INSTALL_TOKEN: 'astrotasas_verified_device_token_v1'
 };
 
 // Configuración inicial por defecto basada en Astro Tasas v2.5.6 real
@@ -594,6 +595,153 @@ class PortalDataService {
       } catch (e) {}
     }
     return filtered;
+  }
+
+  // --- SISTEMA DE VERIFICACIÓN DE INSTALACIONES Y DESCARGAS REALES (OPCIÓN 1) ---
+  getDeviceIdentity() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.DEVICE_INSTALL_TOKEN);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.deviceIdInt && parsed.deviceIdInt > 10000) return parsed;
+      }
+    } catch (e) {}
+
+    // Firma determinista de hardware del dispositivo para impedir inflar contador
+    const ua = navigator.userAgent || 'unknown';
+    const screenSig = `${window.screen?.width || 0}x${window.screen?.height || 0}x${window.screen?.colorDepth || 24}`;
+    const cores = navigator.hardwareConcurrency || 4;
+    const lang = navigator.language || 'es';
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Caracas';
+    const rawFingerprint = `${ua}|${screenSig}|${cores}|${lang}|${tz}`;
+
+    let hash = 5381;
+    for (let i = 0; i < rawFingerprint.length; i++) {
+      hash = ((hash << 5) + hash) ^ rawFingerprint.charCodeAt(i);
+    }
+    const deviceIdInt = (Math.abs(hash) % 2000000000) + 10000;
+
+    let osName = 'Dispositivo Android';
+    if (/android/i.test(ua)) {
+      const match = ua.match(/Android\s+([0-9.]+)(?:;\s*([^)]+))?/i);
+      const ver = match && match[1] ? `Android ${match[1]}` : 'Android';
+      const model = match && match[2] ? match[2].split('Build/')[0].trim() : 'Móvil';
+      osName = `${model} (${ver})`;
+    } else if (/iphone|ipad|ipod/i.test(ua)) {
+      osName = 'iOS / iPhone';
+    } else if (/windows/i.test(ua)) {
+      osName = 'PC Windows';
+    } else if (/macintosh|mac os/i.test(ua)) {
+      osName = 'Mac OS';
+    } else if (/linux/i.test(ua)) {
+      osName = 'Linux';
+    }
+
+    const identity = {
+      deviceIdInt,
+      deviceHashHex: `dev_${deviceIdInt.toString(16)}`,
+      deviceLabel: osName.slice(0, 48),
+      verifiedLocally: false
+    };
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.DEVICE_INSTALL_TOKEN, JSON.stringify(identity));
+    } catch (e) {}
+
+    return identity;
+  }
+
+  async getVerifiedInstallsStats() {
+    const myDevice = this.getDeviceIdentity();
+    const validProviders = ['ANDROID_VERIFIED_INSTALL', 'VERIFIED_DEVICE_DOWNLOAD'];
+
+    if (this.isCloudConnected) {
+      try {
+        const { data, error } = await this.supabase
+          .from('app_settings')
+          .select('id, app_version, apk_provider, apk_url, apk_size, updated_at')
+          .gt('id', 1)
+          .in('apk_provider', validProviders)
+          .order('updated_at', { ascending: false });
+
+        if (!error && Array.isArray(data)) {
+          const androidAppCount = data.filter(r => r.apk_provider === 'ANDROID_VERIFIED_INSTALL').length;
+          const webVerifiedCount = data.filter(r => r.apk_provider === 'VERIFIED_DEVICE_DOWNLOAD').length;
+          const isCurrentDeviceVerified = data.some(r => Number(r.id) === Number(myDevice.deviceIdInt));
+
+          if (isCurrentDeviceVerified && !myDevice.verifiedLocally) {
+            myDevice.verifiedLocally = true;
+            localStorage.setItem(STORAGE_KEYS.DEVICE_INSTALL_TOKEN, JSON.stringify(myDevice));
+          }
+
+          return {
+            totalCount: data.length,
+            androidAppCount,
+            webVerifiedCount,
+            isCurrentDeviceVerified,
+            recentDevices: data.slice(0, 10),
+            myDevice
+          };
+        }
+      } catch (err) {
+        console.warn('Error consultando instalaciones verificadas:', err);
+      }
+    }
+
+    return {
+      totalCount: myDevice.verifiedLocally ? 1 : 0,
+      androidAppCount: 0,
+      webVerifiedCount: myDevice.verifiedLocally ? 1 : 0,
+      isCurrentDeviceVerified: Boolean(myDevice.verifiedLocally),
+      recentDevices: [],
+      myDevice
+    };
+  }
+
+  async registerVerifiedDeviceInstall(appVersion = '2.1.2', sourceType = 'VERIFIED_DEVICE_DOWNLOAD') {
+    const myDevice = this.getDeviceIdentity();
+
+    if (this.isCloudConnected) {
+      try {
+        // Primero verificamos en Supabase si este ID físico de dispositivo ya existe
+        const { data: existing } = await this.supabase
+          .from('app_settings')
+          .select('id, apk_provider')
+          .eq('id', myDevice.deviceIdInt)
+          .maybeSingle();
+
+        if (existing && existing.id) {
+          myDevice.verifiedLocally = true;
+          localStorage.setItem(STORAGE_KEYS.DEVICE_INSTALL_TOKEN, JSON.stringify(myDevice));
+          return { alreadyRegistered: true, registered: false, device: myDevice };
+        }
+
+        // Insertar registro único protegido por Primary Key en PostgreSQL
+        const { error } = await this.supabase
+          .from('app_settings')
+          .upsert({
+            id: myDevice.deviceIdInt,
+            app_version: String(appVersion || '2.1.2'),
+            apk_provider: sourceType,
+            apk_url: myDevice.deviceHashHex,
+            apk_size: myDevice.deviceLabel,
+            apk_updated_at: 'Verificado',
+            apk_changelog: 'Dispositivo único verificado en Supabase',
+            telegram_url: 'https://t.me/+A6xwBk-NT_Y1NGRh',
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'id', ignoreDuplicates: true });
+
+        if (!error) {
+          myDevice.verifiedLocally = true;
+          localStorage.setItem(STORAGE_KEYS.DEVICE_INSTALL_TOKEN, JSON.stringify(myDevice));
+          return { alreadyRegistered: false, registered: true, device: myDevice };
+        }
+      } catch (err) {
+        console.warn('Error registrando dispositivo verificado:', err);
+      }
+    }
+
+    return { alreadyRegistered: Boolean(myDevice.verifiedLocally), registered: false, device: myDevice };
   }
 }
 

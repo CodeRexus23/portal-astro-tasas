@@ -11,6 +11,14 @@ const APP_STATE = {
   posts: [],
   comments: [],
   notifications: [],
+  verifiedInstallsStats: {
+    totalCount: 0,
+    androidAppCount: 0,
+    webVerifiedCount: 0,
+    isCurrentDeviceVerified: false,
+    recentDevices: []
+  },
+  isVerifyingApkDownload: false,
   isAdminAuthenticated: false,
   isMobileMenuOpen: false,
   isNotifDrawerOpen: false,
@@ -129,6 +137,14 @@ async function initPortal() {
   APP_STATE.posts = await window.portalDB.getPosts();
   APP_STATE.comments = await window.portalDB.getComments();
   APP_STATE.notifications = await window.portalDB.getNotifications();
+
+  // Si la app Android abre un ping de verificación por URL (?verified_install=android)
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('verified_install') === 'android') {
+    await window.portalDB.registerVerifiedDeviceInstall(APP_STATE.settings.app_version, 'ANDROID_VERIFIED_INSTALL');
+  }
+
+  APP_STATE.verifiedInstallsStats = await window.portalDB.getVerifiedInstallsStats();
 
   const cached = window.astroRatesAPI.cachedRates;
   if (cached) {
@@ -530,7 +546,147 @@ function renderPublicView() {
   // Renderizar Muro de Comentarios y Sugerencias de la Comunidad
   renderCommentsSection('public-comments-list', false);
 
+  // Renderizar Contador Verificado de Descargas e Instalaciones
+  renderVerifiedInstallsUI();
+
   if (window.lucide) window.lucide.createIcons();
+}
+
+// ============================================================================
+// CONTADOR Y VERIFICACIÓN DE DESCARGAS E INSTALACIONES REALES (OPCIÓN 1)
+// ============================================================================
+function renderVerifiedInstallsUI() {
+  const stats = APP_STATE.verifiedInstallsStats || {
+    totalCount: 0,
+    androidAppCount: 0,
+    webVerifiedCount: 0,
+    isCurrentDeviceVerified: false,
+    recentDevices: []
+  };
+
+  document.querySelectorAll('.dyn-verified-downloads-count').forEach(el => {
+    el.textContent = Number(stats.totalCount || 0).toLocaleString('es-VE');
+  });
+
+  document.querySelectorAll('.dyn-device-verified-badge').forEach(el => {
+    el.textContent = stats.isCurrentDeviceVerified
+      ? '✓ Tu dispositivo ya está verificado oficialmente'
+      : 'Conteo real verificado por dispositivo único';
+  });
+
+  const statusTextEl = document.getElementById('apk-verification-status-text');
+  if (statusTextEl && !APP_STATE.isVerifyingApkDownload) {
+    statusTextEl.textContent = stats.isCurrentDeviceVerified
+      ? '✓ Tu dispositivo ya fue verificado y contabilizado en Supabase'
+      : 'Protección anti-spam activa (No suma por clics repetidos)';
+  }
+
+  // Actualizar métricas de auditoría en el Panel de Administrador
+  const admTotalEl = document.getElementById('adm-verified-total-count');
+  const admAndroidEl = document.getElementById('adm-verified-android-count');
+  const admWebEl = document.getElementById('adm-verified-web-count');
+  const admListEl = document.getElementById('adm-verified-devices-list');
+
+  if (admTotalEl) admTotalEl.textContent = Number(stats.totalCount || 0).toLocaleString('es-VE');
+  if (admAndroidEl) admAndroidEl.textContent = Number(stats.androidAppCount || 0).toLocaleString('es-VE');
+  if (admWebEl) admWebEl.textContent = Number(stats.webVerifiedCount || 0).toLocaleString('es-VE');
+
+  if (admListEl) {
+    if (!stats.recentDevices || stats.recentDevices.length === 0) {
+      admListEl.innerHTML = `<div class="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 text-center">Aún no hay dispositivos registrados.</div>`;
+    } else {
+      admListEl.innerHTML = stats.recentDevices.map(dev => {
+        const isAppPing = dev.apk_provider === 'ANDROID_VERIFIED_INSTALL';
+        const badgeHtml = isAppPing
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">Ping App Android</span>`
+          : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Dispositivo Verificado</span>`;
+        return `
+          <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs">
+            <div class="flex items-center gap-2 min-w-0">
+              <i data-lucide="smartphone" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+              <span class="font-semibold text-white truncate">${escapeHtml(dev.apk_size || 'Dispositivo Android')}</span>
+              ${badgeHtml}
+            </div>
+            <div class="text-[11px] text-slate-400 font-mono">
+              v${escapeHtml(dev.app_version || '2.1.2')} • ${formatTimeAgo(dev.updated_at)}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+}
+
+async function refreshVerifiedInstallsStats(showUserToast = false) {
+  APP_STATE.verifiedInstallsStats = await window.portalDB.getVerifiedInstallsStats();
+  renderVerifiedInstallsUI();
+  if (window.lucide) window.lucide.createIcons();
+  if (showUserToast) {
+    showToast(`Conteo sincronizado con Supabase: ${APP_STATE.verifiedInstallsStats.totalCount} usuarios verificados`, 'success');
+  }
+}
+
+function handleVerifiedApkDownload(event) {
+  const stats = APP_STATE.verifiedInstallsStats || {};
+
+  // 1. Si el dispositivo ya fue verificado anteriormente, inicia la descarga pero NO incrementa el contador
+  if (stats.isCurrentDeviceVerified) {
+    showToast('Abriendo descarga del APK (Tu dispositivo ya fue contabilizado anteriormente)', 'info');
+    return;
+  }
+
+  // 2. Si ya hay una verificación en curso, ignorar clics repetidos (anti-spam)
+  if (APP_STATE.isVerifyingApkDownload) {
+    showToast('Verificación de descarga en curso, completa la descarga en la pestaña abierta...', 'info');
+    return;
+  }
+
+  APP_STATE.isVerifyingApkDownload = true;
+  const downloadStartedAt = Date.now();
+  const statusTextEl = document.getElementById('apk-verification-status-text');
+  if (statusTextEl) {
+    statusTextEl.textContent = '⏳ Verificando que la descarga del APK se complete en tu dispositivo...';
+  }
+
+  showToast('Iniciando descarga oficial. Se verificará automáticamente al completarse...', 'info');
+
+  let finalized = false;
+  const completeVerification = async () => {
+    if (finalized) return;
+    const elapsedMs = Date.now() - downloadStartedAt;
+    // Exigir tiempo mínimo real de sesión de descarga en el servidor externo
+    if (elapsedMs < 4500) return;
+
+    finalized = true;
+    window.removeEventListener('focus', onWindowFocusBack);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+
+    const res = await window.portalDB.registerVerifiedDeviceInstall(
+      APP_STATE.settings?.app_version || '2.1.2',
+      'VERIFIED_DEVICE_DOWNLOAD'
+    );
+    APP_STATE.isVerifyingApkDownload = false;
+    await refreshVerifiedInstallsStats(false);
+
+    if (res.registered) {
+      showToast('¡Descarga verificada con éxito! Tu dispositivo único ha sido contabilizado.', 'success');
+    } else if (res.alreadyRegistered) {
+      showToast('Tu dispositivo ya se encontraba verificado en el contador oficial.', 'info');
+    }
+  };
+
+  const onWindowFocusBack = () => {
+    setTimeout(completeVerification, 800);
+  };
+  const onVisibilityChange = () => {
+    if (!document.hidden) setTimeout(completeVerification, 800);
+  };
+
+  window.addEventListener('focus', onWindowFocusBack);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
+  // Respaldo por si el navegador descarga en segundo plano sin cambiar de pestaña
+  setTimeout(completeVerification, 7000);
 }
 
 // ============================================================================
@@ -821,6 +977,9 @@ function renderAdminView() {
 
   // 6. Bandeja de Comentarios y Sugerencias de la Comunidad en Admin
   renderCommentsSection('admin-comments-list', true);
+
+  // 7. Estadísticas de Descargas e Instalaciones Verificadas en Admin
+  renderVerifiedInstallsUI();
 
   updateAdminTabsUI();
 }

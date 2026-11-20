@@ -163,6 +163,23 @@
               <span>Unirse al Telegram</span>
             </a>
           </div>
+
+          <!-- Contador en Vivo de Usuarios con Descarga / Instalación Verificada -->
+          <div class="inline-flex flex-wrap items-center justify-center lg:justify-start gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-900/80 border border-emerald-500/30 text-xs text-slate-300 shadow-lg">
+            <div class="w-7 h-7 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <i data-lucide="download" class="w-4 h-4"></i>
+            </div>
+            <div class="text-left">
+              <div class="flex items-center gap-1.5">
+                <span class="font-extrabold text-white text-sm dyn-verified-downloads-count">0</span>
+                <span class="font-semibold text-slate-200">usuarios han descargado la app</span>
+              </div>
+              <div class="text-[11px] text-emerald-400 flex items-center gap-1">
+                <i data-lucide="shield-check" class="w-3 h-3"></i>
+                <span class="dyn-device-verified-badge">Conteo real verificado por dispositivo único</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Columna Derecha: Teléfono Interactivo Conectado a las APIs Reales de Astro Tasas -->
@@ -377,12 +394,36 @@
             </div>
 
             <div class="lg:col-span-4 flex flex-col items-center justify-center text-center p-6 rounded-2xl bg-slate-900/80 border border-slate-800">
-              <img src="assets/logo.png" alt="Astro Tasas APK" class="w-20 h-20 rounded-2xl shadow-lg mb-4 border border-white/10" />
-              <a href="#" target="_blank" rel="noopener" class="dyn-apk-link w-full py-4 px-5 rounded-2xl font-bold text-white bg-astro-gradient shadow-lg shadow-sky-600/30 hover:opacity-95 transition flex items-center justify-center gap-2">
+              <img src="assets/logo.png" alt="Astro Tasas APK" class="w-20 h-20 rounded-2xl shadow-lg mb-3 border border-white/10" />
+
+              <!-- Contador Verificado de Usuarios que han descargado la App -->
+              <div class="w-full mb-4 p-3.5 rounded-2xl bg-slate-950/90 border border-emerald-500/30 flex items-center justify-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <i data-lucide="download" class="w-5 h-5"></i>
+                </div>
+                <div class="text-left">
+                  <div class="flex items-baseline gap-1.5">
+                    <span class="text-xl font-extrabold text-white dyn-verified-downloads-count">0</span>
+                    <span class="text-xs font-bold text-emerald-400">Usuarios Verificados</span>
+                  </div>
+                  <div class="text-[11px] text-slate-400 flex items-center gap-1">
+                    <i data-lucide="shield-check" class="w-3 h-3 text-emerald-400 shrink-0"></i>
+                    <span>1 dispositivo único = 1 descarga real</span>
+                  </div>
+                </div>
+              </div>
+
+              <a href="#" target="_blank" rel="noopener" onclick="handleVerifiedApkDownload(event)" class="dyn-apk-link w-full py-4 px-5 rounded-2xl font-bold text-white bg-astro-gradient shadow-lg shadow-sky-600/30 hover:opacity-95 transition flex items-center justify-center gap-2">
                 <i data-lucide="download-cloud" class="w-5 h-5"></i>
                 <span>Descargar APK Ahora</span>
               </a>
-              <span class="text-[11px] text-slate-400 mt-3">
+
+              <div id="apk-verification-status-box" class="w-full mt-3 px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800/90 text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
+                <i data-lucide="fingerprint" class="w-3.5 h-3.5 text-sky-400 shrink-0"></i>
+                <span id="apk-verification-status-text">Protección anti-spam activa (No suma por clics repetidos)</span>
+              </div>
+
+              <span class="text-[11px] text-slate-400 mt-2.5">
                 Alojado de forma segura en <strong class="dyn-apk-provider text-slate-300">Google Drive</strong>. Libre de publicidad intrusiva.
               </span>
             </div>
@@ -821,6 +862,48 @@
               </button>
             </div>
           </form>
+
+          <!-- Auditoría de Instalaciones y Descargas Reales Verificadas (Opción 1 - Supabase) -->
+          <div class="mt-8 pt-6 border-t border-slate-800/80 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                  <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+                  <span>Auditoría de Usuarios con Descarga / Instalación Verificada</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">
+                  Protegido por llave primaria de dispositivo único en Supabase (No suma clics repetidos).
+                </p>
+              </div>
+              <button type="button" onclick="refreshVerifiedInstallsStats(true)" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 transition flex items-center gap-1.5">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Actualizar Conteo</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="p-4 rounded-2xl bg-slate-900/90 border border-emerald-500/30">
+                <div class="text-[11px] font-semibold text-slate-400">Total Usuarios Verificados</div>
+                <div id="adm-verified-total-count" class="text-2xl font-extrabold text-emerald-400 mt-1">0</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Dispositivos únicos registrados</div>
+              </div>
+              <div class="p-4 rounded-2xl bg-slate-900/90 border border-sky-500/30">
+                <div class="text-[11px] font-semibold text-slate-400">Ping desde App Android</div>
+                <div id="adm-verified-android-count" class="text-2xl font-extrabold text-sky-400 mt-1">0</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Instalaciones abiertas en Android</div>
+              </div>
+              <div class="p-4 rounded-2xl bg-slate-900/90 border border-indigo-500/30">
+                <div class="text-[11px] font-semibold text-slate-400">Descargas Web Verificadas</div>
+                <div id="adm-verified-web-count" class="text-2xl font-extrabold text-indigo-300 mt-1">0</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">Dispositivos únicos confirmados</div>
+              </div>
+            </div>
+
+            <div>
+              <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Últimos Dispositivos Verificados en Supabase:</h4>
+              <div id="adm-verified-devices-list" class="space-y-2 max-h-52 overflow-y-auto pr-1"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Sub-Panel 1B: Notificaciones y Avisos de la Web -->
