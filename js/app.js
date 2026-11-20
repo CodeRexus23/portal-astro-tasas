@@ -11,6 +11,8 @@ const APP_STATE = {
   posts: [],
   comments: [],
   notifications: [],
+  mirrors: [],
+  editingMirrorId: null,
   verifiedInstallsStats: {
     totalCount: 0,
     androidAppCount: 0,
@@ -137,6 +139,7 @@ async function initPortal() {
   APP_STATE.posts = await window.portalDB.getPosts();
   APP_STATE.comments = await window.portalDB.getComments();
   APP_STATE.notifications = await window.portalDB.getNotifications();
+  APP_STATE.mirrors = await window.portalDB.getApkMirrors();
 
   // Si la app Android abre un ping de verificación por URL (?verified_install=android)
   const urlParams = new URLSearchParams(window.location.search);
@@ -288,18 +291,7 @@ function renderNavbarForView(viewName) {
       </a>
     `;
 
-    ctaHtml = `
-      <div class="hidden sm:flex items-center gap-2">
-        <a href="${escapeHtml(tgUrl)}" target="_blank" rel="noopener" title="Unirse a la Comunidad de Telegram" class="whitespace-nowrap inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-[#0088cc] hover:bg-[#0077b5] shadow-lg shadow-sky-500/20 transition">
-          <i data-lucide="send" class="w-3.5 h-3.5 shrink-0"></i>
-          <span>Telegram</span>
-        </a>
-        <button onclick="scrollToSection('descarga-apk', 'public')" class="whitespace-nowrap inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-astro-gradient shadow-lg shadow-sky-600/25 hover:opacity-95 transition">
-          <i data-lucide="download" class="w-3.5 h-3.5 shrink-0"></i>
-          <span>Descargar APK</span>
-        </button>
-      </div>
-    `;
+    ctaHtml = ``;
   } else if (viewName === 'admin') {
     navBadge.innerHTML = `<span class="whitespace-nowrap px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">Modo Admin</span>`;
 
@@ -967,6 +959,9 @@ function renderAdminView() {
           <button onclick="openArticleModal(${p.id})" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-200 hover:bg-slate-700 transition">
             Ver
           </button>
+          <button onclick="openEditPostModal(${p.id})" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/15 text-sky-300 hover:bg-sky-500/30 transition flex items-center gap-1">
+            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Editar
+          </button>
           <button onclick="handleDeletePost(${p.id})" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-500/15 text-rose-300 hover:bg-rose-500/30 transition">
             Eliminar
           </button>
@@ -980,6 +975,9 @@ function renderAdminView() {
 
   // 7. Estadísticas de Descargas e Instalaciones Verificadas en Admin
   renderVerifiedInstallsUI();
+
+  // 8. Lista de Servidores y Nubes de Descarga en Admin
+  renderAdminMirrors();
 
   updateAdminTabsUI();
 }
@@ -1214,6 +1212,349 @@ function formatTimeAgo(isoStr) {
   } catch (e) {
     return 'Hoy';
   }
+}
+
+// ============================================================================
+// ACCESO SECRETO AL PANEL DE ADMINISTRADOR (TRIPLE TOQUE EN EL LOGO/TÍTULO)
+// ============================================================================
+let secretAdminTapCount = 0;
+let secretAdminTapTimer = null;
+
+function handleSecretAdminTap() {
+  if (APP_STATE.currentView === 'admin') return;
+
+  secretAdminTapCount++;
+  clearTimeout(secretAdminTapTimer);
+  secretAdminTapTimer = setTimeout(() => {
+    secretAdminTapCount = 0;
+  }, 1200);
+
+  if (secretAdminTapCount >= 3) {
+    secretAdminTapCount = 0;
+    showToast('Acceso de Administrador Activado', 'info');
+    switchView('admin');
+  }
+}
+
+// ============================================================================
+// MODAL DE DESCARGA MULTINUBE (NUBES PERSONALIZADAS CON COLORES)
+// ============================================================================
+function getMirrorButtonStyles(color) {
+  const c = (color || 'sky').toLowerCase();
+  switch (c) {
+    case 'emerald':
+    case 'green':
+      return {
+        btnClass: 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 border-emerald-500/40',
+        badgeClass: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40',
+        dotColor: 'bg-emerald-400'
+      };
+    case 'rose':
+    case 'red':
+      return {
+        btnClass: 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30 border-rose-500/40',
+        badgeClass: 'bg-rose-950/90 text-rose-300 border-rose-500/40',
+        dotColor: 'bg-rose-400'
+      };
+    case 'violet':
+    case 'purple':
+      return {
+        btnClass: 'bg-violet-600 hover:bg-violet-500 text-white shadow-violet-600/30 border-violet-500/40',
+        badgeClass: 'bg-violet-950/90 text-violet-300 border-violet-500/40',
+        dotColor: 'bg-violet-400'
+      };
+    case 'amber':
+    case 'orange':
+      return {
+        btnClass: 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold shadow-amber-500/30 border-amber-400/50',
+        badgeClass: 'bg-amber-950/90 text-amber-200 border-amber-500/40',
+        dotColor: 'bg-amber-400'
+      };
+    case 'sky':
+    case 'blue':
+    default:
+      if (c.startsWith('#')) {
+        return {
+          btnClass: 'text-white border-white/20',
+          badgeClass: 'bg-slate-950/80 text-white border-white/30',
+          dotColor: 'bg-white',
+          customStyle: `background-color: ${c};`
+        };
+      }
+      return {
+        btnClass: 'bg-sky-600 hover:bg-sky-500 text-white shadow-sky-600/30 border-sky-500/40',
+        badgeClass: 'bg-sky-950/90 text-sky-300 border-sky-500/40',
+        dotColor: 'bg-sky-400'
+      };
+  }
+}
+
+function openApkDownloadModal() {
+  const modal = document.getElementById('apk-download-modal');
+  if (!modal) return;
+  renderApkDownloadModal();
+  modal.classList.remove('hidden');
+}
+
+function closeApkDownloadModal() {
+  const modal = document.getElementById('apk-download-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function renderApkDownloadModal() {
+  const container = document.getElementById('apk-modal-mirrors-list');
+  if (!container) return;
+
+  const mirrors = APP_STATE.mirrors && APP_STATE.mirrors.length > 0
+    ? APP_STATE.mirrors
+    : [
+        {
+          id: 'default_main',
+          name: APP_STATE.settings?.apk_provider || 'Google Drive Oficial',
+          url: APP_STATE.settings?.apk_url || 'https://drive.google.com/',
+          color: 'sky',
+          badge: 'Principal'
+        }
+      ];
+
+  container.innerHTML = mirrors.map(m => {
+    const style = getMirrorButtonStyles(m.color);
+    const customAttr = style.customStyle ? `style="${style.customStyle}"` : '';
+    const badgeText = m.badge ? `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold border ${style.badgeClass}">${escapeHtml(m.badge)}</span>` : '';
+
+    return `
+      <div onclick="downloadFromMirror('${escapeHtml(m.url)}', '${escapeHtml(m.name)}')" ${customAttr} class="cursor-pointer group w-full p-4 rounded-2xl border shadow-lg transition transform hover:scale-[1.01] flex items-center justify-between gap-3 ${style.btnClass}">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-10 h-10 rounded-xl bg-black/20 flex items-center justify-center shrink-0">
+            <i data-lucide="cloud-download" class="w-5 h-5"></i>
+          </div>
+          <div class="text-left min-w-0">
+            <div class="font-extrabold text-sm sm:text-base truncate">${escapeHtml(m.name)}</div>
+            <div class="text-[11px] opacity-85 truncate">Descargar APK directa</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          ${badgeText}
+          <i data-lucide="arrow-right" class="w-4 h-4 transform group-hover:translate-x-1 transition"></i>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function downloadFromMirror(mirrorUrl, mirrorName) {
+  closeApkDownloadModal();
+  handleVerifiedApkDownload({ target: { href: mirrorUrl } });
+  window.open(mirrorUrl, '_blank', 'noopener');
+  showToast(`Iniciando descarga desde ${mirrorName}...`, 'success');
+}
+
+// ============================================================================
+// GESTIÓN DE SERVIDORES Y NUBES DE DESCARGA EN PANEL DE ADMINISTRADOR
+// ============================================================================
+function renderAdminMirrors() {
+  const container = document.getElementById('admin-mirrors-list');
+  if (!container) return;
+
+  const mirrors = APP_STATE.mirrors || [];
+
+  if (mirrors.length === 0) {
+    container.innerHTML = `<div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 text-xs text-slate-400 text-center">No hay servidores de descarga configurados. Agrega uno abajo.</div>`;
+    return;
+  }
+
+  container.innerHTML = mirrors.map(m => {
+    const style = getMirrorButtonStyles(m.color);
+    const customAttr = style.customStyle ? `style="${style.customStyle}"` : '';
+
+    return `
+      <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800">
+        <div class="flex items-center gap-3 min-w-0">
+          <div ${customAttr} class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${style.btnClass} shrink-0">
+            <i data-lucide="cloud" class="w-4 h-4"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-white text-xs sm:text-sm truncate">${escapeHtml(m.name)}</span>
+              ${m.badge ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 text-sky-300 border border-slate-700">${escapeHtml(m.badge)}</span>` : ''}
+            </div>
+            <a href="${escapeHtml(m.url)}" target="_blank" rel="noopener" class="text-[11px] text-slate-400 hover:text-sky-300 truncate block font-mono max-w-xs sm:max-w-md">${escapeHtml(m.url)}</a>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button onclick="editMirror('${m.id}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/15 text-sky-300 hover:bg-sky-500/30 transition flex items-center gap-1">
+            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Editar
+          </button>
+          <button onclick="deleteMirror('${m.id}')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-500/15 text-rose-300 hover:bg-rose-500/30 transition">
+            Eliminar
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+async function handleSaveMirror(e) {
+  e.preventDefault();
+  const id = document.getElementById('adm-mirror-id').value.trim();
+  const name = document.getElementById('adm-mirror-name').value.trim();
+  const url = document.getElementById('adm-mirror-url').value.trim();
+  const badge = document.getElementById('adm-mirror-badge').value.trim();
+
+  let color = 'sky';
+  const selectedRadio = document.querySelector('input[name="mirror-color"]:checked');
+  if (selectedRadio) color = selectedRadio.value;
+
+  const customColorInput = document.getElementById('adm-mirror-color-custom');
+  if (color === 'sky' && customColorInput && customColorInput.value !== '#0088cc') {
+    color = customColorInput.value;
+  }
+
+  if (!name || !url) {
+    showToast('Ingresa el nombre del servidor y la URL de descarga', 'error');
+    return;
+  }
+
+  let list = [...(APP_STATE.mirrors || [])];
+
+  if (id) {
+    const idx = list.findIndex(m => m.id === id);
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], name, url, badge, color };
+    }
+  } else {
+    list.push({
+      id: `mirror_${Date.now()}`,
+      name,
+      url,
+      badge,
+      color
+    });
+  }
+
+  APP_STATE.mirrors = await window.portalDB.saveApkMirrors(list);
+  cancelEditMirror();
+  renderAdminMirrors();
+  showToast('Servidor de descarga guardado exitosamente', 'success');
+}
+
+function editMirror(id) {
+  const m = (APP_STATE.mirrors || []).find(x => x.id === id);
+  if (!m) return;
+
+  APP_STATE.editingMirrorId = id;
+  document.getElementById('adm-mirror-id').value = m.id;
+  document.getElementById('adm-mirror-name').value = m.name;
+  document.getElementById('adm-mirror-url').value = m.url;
+  document.getElementById('adm-mirror-badge').value = m.badge || '';
+
+  const radios = document.querySelectorAll('input[name="mirror-color"]');
+  let matchedRadio = false;
+  radios.forEach(r => {
+    if (r.value === m.color) {
+      r.checked = true;
+      matchedRadio = true;
+    }
+  });
+
+  const customPicker = document.getElementById('adm-mirror-color-custom');
+  if (!matchedRadio && customPicker && m.color.startsWith('#')) {
+    customPicker.value = m.color;
+  }
+
+  document.getElementById('admin-mirror-form-title').innerHTML = `
+    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+    <span>Editar Servidor de Descarga: ${escapeHtml(m.name)}</span>
+  `;
+  document.getElementById('adm-mirror-submit-btn').innerHTML = `
+    <i data-lucide="check" class="w-4 h-4"></i>
+    <span>Actualizar Servidor</span>
+  `;
+  document.getElementById('adm-mirror-cancel-btn').classList.remove('hidden');
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function cancelEditMirror() {
+  APP_STATE.editingMirrorId = null;
+  document.getElementById('adm-mirror-id').value = '';
+  document.getElementById('adm-mirror-name').value = '';
+  document.getElementById('adm-mirror-url').value = '';
+  document.getElementById('adm-mirror-badge').value = '';
+
+  document.getElementById('admin-mirror-form-title').innerHTML = `
+    <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+    <span>Agregar Nuevo Servidor de Descarga</span>
+  `;
+  document.getElementById('adm-mirror-submit-btn').innerHTML = `
+    <i data-lucide="plus" class="w-4 h-4"></i>
+    <span>Agregar Servidor</span>
+  `;
+  document.getElementById('adm-mirror-cancel-btn').classList.add('hidden');
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+async function deleteMirror(id) {
+  let list = (APP_STATE.mirrors || []).filter(m => m.id !== id);
+  if (list.length === 0) {
+    showToast('Debes mantener al menos un servidor de descarga activo', 'info');
+    return;
+  }
+  APP_STATE.mirrors = await window.portalDB.saveApkMirrors(list);
+  if (APP_STATE.editingMirrorId === id) cancelEditMirror();
+  renderAdminMirrors();
+  showToast('Servidor de descarga eliminado', 'info');
+}
+
+// ============================================================================
+// EDICIÓN DE ARTÍCULOS DEL BLOG EN PANEL DE ADMINISTRADOR
+// ============================================================================
+function openEditPostModal(postId) {
+  const post = APP_STATE.posts.find(p => String(p.id) === String(postId));
+  if (!post) return;
+
+  document.getElementById('edit-post-id').value = post.id;
+  document.getElementById('edit-post-title').value = post.title || '';
+  document.getElementById('edit-post-category').value = post.category || 'Novedades';
+  document.getElementById('edit-post-readtime').value = post.read_time || '3 min';
+  document.getElementById('edit-post-summary').value = post.summary || '';
+  document.getElementById('edit-post-content').value = post.content || '';
+
+  const modal = document.getElementById('admin-edit-post-modal');
+  if (modal) modal.classList.remove('hidden');
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function closeEditPostModal() {
+  const modal = document.getElementById('admin-edit-post-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleSaveEditedPost(e) {
+  e.preventDefault();
+  const id = document.getElementById('edit-post-id').value;
+  const title = document.getElementById('edit-post-title').value.trim();
+  const category = document.getElementById('edit-post-category').value.trim();
+  const read_time = document.getElementById('edit-post-readtime').value.trim() || '3 min';
+  const summary = document.getElementById('edit-post-summary').value.trim();
+  const content = document.getElementById('edit-post-content').value.trim();
+
+  if (!title || !summary || !content) {
+    showToast('Completa el título, resumen y contenido del artículo', 'error');
+    return;
+  }
+
+  await window.portalDB.updatePost(id, { title, category, read_time, summary, content });
+  APP_STATE.posts = await window.portalDB.getPosts();
+
+  closeEditPostModal();
+  renderAdminView();
+  showToast('¡Artículo actualizado exitosamente en Supabase Cloud!', 'success');
 }
 
 function setupEventListeners() {

@@ -13,8 +13,34 @@ const STORAGE_KEYS = {
   SUPABASE_CFG: 'astrotasas_supabase_config_v1',
   ADMIN_AUTH: 'astrotasas_admin_session_v1',
   ADMIN_PASS: 'astrotasas_admin_pass_v1',
-  DEVICE_INSTALL_TOKEN: 'astrotasas_verified_device_token_v1'
+  DEVICE_INSTALL_TOKEN: 'astrotasas_verified_device_token_v1',
+  MIRRORS: 'astrotasas_apk_mirrors_v1'
 };
+
+// Nubes y Servidores de Descarga por Defecto (Multinube Dinámica)
+const DEFAULT_MIRRORS = [
+  {
+    id: 'm1',
+    name: 'Google Drive Oficial',
+    url: 'https://drive.google.com/file/d/1e_v9z5uLxcSsfzvYjWwfuVmpCv_ZoRdw/view?usp=drivesdk',
+    color: 'sky',
+    badge: 'Recomendado'
+  },
+  {
+    id: 'm2',
+    name: 'Mega Cloud',
+    url: 'https://mega.nz/',
+    color: 'rose',
+    badge: 'Espejo Rápido'
+  },
+  {
+    id: 'm3',
+    name: 'Mediafire',
+    url: 'https://mediafire.com/',
+    color: 'emerald',
+    badge: 'Directo'
+  }
+];
 
 // Configuración inicial por defecto basada en Astro Tasas v2.5.6 real
 const DEFAULT_SETTINGS = {
@@ -498,6 +524,97 @@ class PortalDataService {
       } catch (e) {}
     }
     return filtered;
+  }
+
+  async updatePost(postId, postData) {
+    const current = await this.getPosts();
+    const idx = current.findIndex(p => String(p.id) === String(postId));
+    if (idx === -1) return null;
+
+    current[idx] = {
+      ...current[idx],
+      title: postData.title,
+      category: postData.category || 'Novedades',
+      summary: postData.summary,
+      content: postData.content,
+      read_time: postData.read_time || '3 min',
+      updated_at: new Date().toISOString()
+    };
+
+    localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(current));
+
+    if (this.isCloudConnected) {
+      try {
+        await this.supabase
+          .from('posts')
+          .update({
+            title: current[idx].title,
+            category: current[idx].category,
+            summary: current[idx].summary,
+            content: current[idx].content,
+            read_time: current[idx].read_time
+          })
+          .eq('id', postId);
+      } catch (e) {
+        console.warn('Error actualizando post en Supabase:', e);
+      }
+    }
+    return current[idx];
+  }
+
+  // --- SERVIDORES Y NUBES DE DESCARGA (MULTINUBE DINÁMICA CON COLORES) ---
+  async getApkMirrors() {
+    if (this.isCloudConnected) {
+      try {
+        const { data, error } = await this.supabase
+          .from('app_settings')
+          .select('apk_url')
+          .eq('id', 2)
+          .maybeSingle();
+
+        if (!error && data && data.apk_url) {
+          const parsed = JSON.parse(data.apk_url);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            localStorage.setItem(STORAGE_KEYS.MIRRORS, JSON.stringify(parsed));
+            return parsed;
+          }
+        }
+      } catch (e) {}
+    }
+
+    try {
+      const local = localStorage.getItem(STORAGE_KEYS.MIRRORS);
+      if (local) return JSON.parse(local);
+    } catch (e) {}
+
+    localStorage.setItem(STORAGE_KEYS.MIRRORS, JSON.stringify(DEFAULT_MIRRORS));
+    return [...DEFAULT_MIRRORS];
+  }
+
+  async saveApkMirrors(mirrorsList) {
+    const cleanList = Array.isArray(mirrorsList) ? mirrorsList : DEFAULT_MIRRORS;
+    localStorage.setItem(STORAGE_KEYS.MIRRORS, JSON.stringify(cleanList));
+
+    if (this.isCloudConnected) {
+      try {
+        await this.supabase
+          .from('app_settings')
+          .upsert({
+            id: 2,
+            app_version: '2.5.6',
+            apk_provider: 'MIRRORS_CONFIG',
+            apk_url: JSON.stringify(cleanList),
+            apk_size: 'Multi-cloud',
+            apk_updated_at: 'Actualizado',
+            apk_changelog: 'Lista dinámica de nubes de descarga',
+            telegram_url: 'https://t.me/+A6xwBk-NT_Y1NGRh',
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'id' });
+      } catch (e) {
+        console.warn('Error guardando mirrors en Supabase:', e);
+      }
+    }
+    return cleanList;
   }
 
   // --- COMENTARIOS Y SUGERENCIAS DE LA COMUNIDAD (CON PUNTAJE DE 5 ESTRELLAS) ---

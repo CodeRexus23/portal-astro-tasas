@@ -32,10 +32,10 @@
        ======================================================================== -->
   <header class="glass-nav sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2 sm:gap-4">
-      <!-- Marca Astro Tasas -->
-      <div class="flex items-center gap-2.5 shrink-0">
-        <img src="assets/logo.png" alt="Logo Astro Tasas" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl shadow-md border border-white/10 object-cover shrink-0" />
-        <div class="flex items-center gap-2">
+      <!-- Marca Astro Tasas con acceso secreto al Admin mediante triple toque -->
+      <div onclick="handleSecretAdminTap()" class="flex items-center gap-2.5 shrink-0 cursor-pointer select-none" title="Astro Tasas">
+        <img src="assets/logo.png" alt="Logo Astro Tasas" class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl shadow-md border border-white/10 object-cover shrink-0 pointer-events-none" />
+        <div class="flex items-center gap-2 pointer-events-none">
           <span class="font-extrabold text-base sm:text-lg tracking-tight text-white whitespace-nowrap">Astro Tasas</span>
           <div id="navbar-mode-badge" class="hidden sm:block"></div>
         </div>
@@ -150,11 +150,11 @@
 
           <!-- Botones de Acción + Botón Oficial Comunidad de Telegram -->
           <div class="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center lg:justify-start gap-3.5 pt-2">
-            <button onclick="scrollToSection('descarga-apk', 'public')" class="inline-flex items-center justify-center gap-3 px-6 py-4 rounded-2xl font-bold text-white bg-astro-gradient shadow-xl shadow-sky-600/30 hover:scale-[1.01] transition">
+            <button onclick="openApkDownloadModal()" class="inline-flex items-center justify-center gap-3 px-6 py-4 rounded-2xl font-bold text-white bg-astro-gradient shadow-xl shadow-sky-600/30 hover:scale-[1.01] transition">
               <i data-lucide="smartphone" class="w-5 h-5 shrink-0"></i>
               <div class="text-left">
                 <div class="text-[11px] font-normal text-sky-100">Descarga Directa Android (APK)</div>
-                <div class="text-sm sm:text-base leading-none mt-0.5">Descargar desde <span class="dyn-apk-provider">Google Drive</span></div>
+                <div class="text-sm sm:text-base leading-none mt-0.5">Elegir Servidor de Descarga <i data-lucide="chevron-right" class="w-3.5 h-3.5 inline"></i></div>
               </div>
             </button>
 
@@ -413,10 +413,10 @@
                 </div>
               </div>
 
-              <a href="#" target="_blank" rel="noopener" onclick="handleVerifiedApkDownload(event)" class="dyn-apk-link w-full py-4 px-5 rounded-2xl font-bold text-white bg-astro-gradient shadow-lg shadow-sky-600/30 hover:opacity-95 transition flex items-center justify-center gap-2">
+              <button onclick="openApkDownloadModal()" class="w-full py-4 px-5 rounded-2xl font-bold text-white bg-astro-gradient shadow-lg shadow-sky-600/30 hover:opacity-95 transition flex items-center justify-center gap-2">
                 <i data-lucide="download-cloud" class="w-5 h-5"></i>
-                <span>Descargar APK Ahora</span>
-              </a>
+                <span>Descargar APK (Elegir Servidor)</span>
+              </button>
 
               <div id="apk-verification-status-box" class="w-full mt-3 px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800/90 text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
                 <i data-lucide="fingerprint" class="w-3.5 h-3.5 text-sky-400 shrink-0"></i>
@@ -863,6 +863,101 @@
             </div>
           </form>
 
+          <!-- Gestión de Servidores y Nubes Externas de Descarga (Multinube Dinámica con Colores) -->
+          <div class="mt-8 pt-6 border-t border-slate-800/80 space-y-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                  <i data-lucide="cloud" class="w-4 h-4 text-sky-400"></i>
+                  <span>Servidores y Nubes Externas de Descarga (Multinube)</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">
+                  Agrega todos los enlaces de descarga que quieras (Google Drive, Mega, Mediafire, etc.) y personaliza el color de cada botón.
+                </p>
+              </div>
+            </div>
+
+            <!-- Lista de Nubes Actuales -->
+            <div id="admin-mirrors-list" class="space-y-2.5"></div>
+
+            <!-- Formulario para Agregar o Editar Nube -->
+            <div class="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-4">
+              <h4 id="admin-mirror-form-title" class="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
+                <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                <span>Agregar Nuevo Servidor de Descarga</span>
+              </h4>
+
+              <form onsubmit="handleSaveMirror(event)" class="space-y-3.5">
+                <input type="hidden" id="adm-mirror-id" value="" />
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre del Servidor / Nube *</label>
+                    <input id="adm-mirror-name" type="text" placeholder="Ej: Google Drive, Mega, Mediafire" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white" required />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Etiqueta Opcional</label>
+                    <input id="adm-mirror-badge" type="text" placeholder="Ej: Oficial, Recomendado, Rápido" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white" />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-slate-300 mb-1">URL de Descarga del APK *</label>
+                  <input id="adm-mirror-url" type="url" placeholder="https://..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-sky-300 font-mono" required />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-slate-300 mb-1.5">Color del Botón de Descarga</label>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <label class="cursor-pointer">
+                      <input type="radio" name="mirror-color" value="sky" checked class="peer sr-only" />
+                      <div class="px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-600/30 text-sky-300 border border-sky-500/50 peer-checked:bg-sky-500 peer-checked:text-white transition flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> Azul / Celeste
+                      </div>
+                    </label>
+                    <label class="cursor-pointer">
+                      <input type="radio" name="mirror-color" value="emerald" class="peer sr-only" />
+                      <div class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600/30 text-emerald-300 border border-emerald-500/50 peer-checked:bg-emerald-500 peer-checked:text-white transition flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Verde
+                      </div>
+                    </label>
+                    <label class="cursor-pointer">
+                      <input type="radio" name="mirror-color" value="rose" class="peer sr-only" />
+                      <div class="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600/30 text-rose-300 border border-rose-500/50 peer-checked:bg-rose-500 peer-checked:text-white transition flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span> Rojo / Magenta
+                      </div>
+                    </label>
+                    <label class="cursor-pointer">
+                      <input type="radio" name="mirror-color" value="violet" class="peer sr-only" />
+                      <div class="px-3 py-1.5 rounded-xl text-xs font-bold bg-violet-600/30 text-violet-300 border border-violet-500/50 peer-checked:bg-violet-500 peer-checked:text-white transition flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-violet-400"></span> Morado
+                      </div>
+                    </label>
+                    <label class="cursor-pointer">
+                      <input type="radio" name="mirror-color" value="amber" class="peer sr-only" />
+                      <div class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600/30 text-amber-300 border border-amber-500/50 peer-checked:bg-amber-500 peer-checked:text-slate-950 transition flex items-center gap-1.5">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Naranja / Oro
+                      </div>
+                    </label>
+                    <div class="flex items-center gap-1.5 pl-2">
+                      <input type="color" id="adm-mirror-color-custom" value="#0088cc" title="Color personalizado" class="w-7 h-7 rounded-lg border border-slate-700 bg-transparent cursor-pointer" />
+                      <span class="text-[11px] text-slate-400">Personalizado</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-2">
+                  <button type="button" id="adm-mirror-cancel-btn" onclick="cancelEditMirror()" class="hidden px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 transition">
+                    Cancelar
+                  </button>
+                  <button type="submit" id="adm-mirror-submit-btn" class="px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-sky-600 hover:bg-sky-500 transition flex items-center gap-1.5">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Agregar Servidor</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
           <!-- Auditoría de Instalaciones y Descargas Reales Verificadas (Opción 1 - Supabase) -->
           <div class="mt-8 pt-6 border-t border-slate-800/80 space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -1148,6 +1243,101 @@
   </div>
 
   <!-- ========================================================================
+       MODAL DE DESCARGA MULTINUBE (OPCIONES PERSONALIZADAS DE NUBES Y COLORES)
+       ======================================================================== -->
+  <div id="apk-download-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-card rounded-3xl max-w-lg w-full flex flex-col border border-slate-700 shadow-2xl overflow-hidden animate-fade-in">
+      <div class="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+            <i data-lucide="download-cloud" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-lg font-extrabold text-white">Descargar Astro Tasas Android</h3>
+            <p class="text-xs text-slate-400">Selecciona tu servidor o nube externa preferida</p>
+          </div>
+        </div>
+        <button onclick="closeApkDownloadModal()" class="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-5 sm:p-6 space-y-3 max-h-[60vh] overflow-y-auto">
+        <div id="apk-modal-mirrors-list" class="space-y-2.5"></div>
+      </div>
+
+      <div class="p-4 border-t border-slate-800 bg-slate-900/60 flex items-center justify-between text-xs text-slate-400">
+        <span class="flex items-center gap-1 text-emerald-400">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Libre de publicidad intrusiva
+        </span>
+        <button onclick="closeApkDownloadModal()" class="px-4 py-1.5 rounded-xl font-semibold bg-slate-800 text-slate-300 hover:text-white transition">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL DE EDICIÓN DE ARTÍCULOS DEL BLOG (PANEL DE ADMINISTRADOR)
+       ======================================================================== -->
+  <div id="admin-edit-post-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-card rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-sky-500/30 shadow-2xl overflow-hidden animate-fade-in">
+      <div class="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400">
+            <i data-lucide="edit-3" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-extrabold text-white">Editar Artículo del Blog</h3>
+            <p class="text-xs text-slate-400">Modifica el contenido del artículo ya publicado</p>
+          </div>
+        </div>
+        <button onclick="closeEditPostModal()" class="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleSaveEditedPost(event)" class="p-5 sm:p-6 overflow-y-auto space-y-4">
+        <input type="hidden" id="edit-post-id" value="" />
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Título del Artículo *</label>
+          <input id="edit-post-title" type="text" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" required />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Categoría</label>
+            <input id="edit-post-category" type="text" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" required />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Tiempo de Lectura Estimado</label>
+            <input id="edit-post-readtime" type="text" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Resumen Corto (Aparece en la tarjeta) *</label>
+          <textarea id="edit-post-summary" rows="2" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white" required></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Contenido Completo (Soporta Markdown) *</label>
+          <textarea id="edit-post-content" rows="6" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white font-mono" required></textarea>
+        </div>
+
+        <div class="pt-2 border-t border-slate-800 flex justify-end gap-2">
+          <button type="button" onclick="closeEditPostModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-bold bg-sky-600 text-white hover:bg-sky-500 transition flex items-center gap-1.5">
+            <i data-lucide="check" class="w-4 h-4"></i> Guardar Cambios
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
        PIE DE PÁGINA
        ======================================================================== -->
   <footer class="border-t border-slate-800/80 bg-slate-950/70 py-8 mt-12">
@@ -1162,11 +1352,6 @@
           <i data-lucide="send" class="w-3.5 h-3.5"></i> Comunidad Telegram
         </a>
         <span>© 2026 Astro Tasas. Todos los derechos reservados.</span>
-        <!-- Acceso discreto para el administrador -->
-        <button onclick="switchView('admin')" title="Acceso de Gestión" class="text-slate-500 hover:text-slate-300 transition flex items-center gap-1 text-[11px] py-1 px-2 rounded-lg hover:bg-slate-900 border border-transparent hover:border-slate-800">
-          <i data-lucide="lock" class="w-3 h-3"></i>
-          <span>Admin</span>
-        </button>
       </div>
     </div>
   </footer>
